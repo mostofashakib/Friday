@@ -1,0 +1,59 @@
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/react";
+import "./globals.css";
+
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+export const metadata: Metadata = {
+  title: "Friday — AI Interview Coach | Ace Your Next Interview",
+  description:
+    "Friday is an AI-powered mock interview coach that adapts to your skill level. Practice behavioral, technical, and role-based interviews with real-time feedback and voice interaction.",
+  keywords: [
+    "AI interview coach",
+    "mock interview",
+    "interview preparation",
+    "behavioral interview practice",
+    "technical interview prep",
+    "AI interview feedback",
+    "job interview practice",
+  ],
+  openGraph: {
+    title: "Friday — AI Interview Coach",
+    description:
+      "Practice interviews with an AI that adapts to you. Get instant feedback, coaching, and voice-first interaction.",
+    type: "website",
+    siteName: "Friday",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Friday — AI Interview Coach",
+    description:
+      "Practice interviews with an AI that adapts to you. Get instant feedback, coaching, and voice-first interaction.",
+  },
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en">
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+      >
+        {children}
+        <Analytics />
+      </body>
+    </html>
+  );
+}
