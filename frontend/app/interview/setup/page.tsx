@@ -33,8 +33,13 @@ export default function InterviewSetupPage() {
     setError("");
     try {
       const { session_id } = await createSession(type, role || null, difficulty);
-      await startSession(session_id);
-      router.push(`/interview/${session_id}`);
+      if (type === "technical") {
+        // Technical interviews use the coding environment — skip the LangGraph agent
+        router.push(`/interview/technical/${session_id}`);
+      } else {
+        await startSession(session_id);
+        router.push(`/interview/${session_id}`);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to start interview");
       setLoading(false);

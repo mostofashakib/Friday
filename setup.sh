@@ -6,9 +6,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT/backend"
 FRONTEND_DIR="$ROOT/frontend"
+VENV_DIR="$ROOT/.venv"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -93,19 +94,24 @@ fi
 # ── Step 2: Python virtual environment ───────────────────────────────────────
 log "Setting up Python environment"
 
-if [[ ! -d "$BACKEND_DIR/.venv" ]]; then
-  echo -n "  Creating virtual environment..."
-  python3 -m venv "$BACKEND_DIR/.venv"
+if [[ ! -d "$VENV_DIR" ]]; then
+  echo -n "  Creating virtual environment at .venv ..."
+  python3 -m venv "$VENV_DIR"
   echo " done"
 else
-  ok "Virtual environment already exists"
+  ok "Virtual environment already exists ($VENV_DIR)"
 fi
 
 echo -n "  Installing Python dependencies..."
-"$BACKEND_DIR/.venv/bin/pip" install -q --upgrade pip
-"$BACKEND_DIR/.venv/bin/pip" install -q -r "$BACKEND_DIR/requirements.txt"
+"$VENV_DIR/bin/pip" install -q --upgrade pip
+"$VENV_DIR/bin/pip" install -q -r "$BACKEND_DIR/requirements.txt"
 echo " done"
 ok "Backend dependencies installed"
+
+# Activate for the rest of setup
+# shellcheck source=/dev/null
+source "$VENV_DIR/bin/activate"
+ok "Virtual environment activated ($(python --version))"
 
 # ── Step 3: Node.js dependencies ─────────────────────────────────────────────
 log "Installing frontend dependencies"
@@ -237,6 +243,6 @@ echo -e "${BOLD}╚════════════════════�
 echo ""
 echo -e "  Next steps:"
 echo -e "    ${GREEN}1.${RESET} Run the schema SQL in your Supabase SQL editor"
-echo -e "    ${GREEN}2.${RESET} Start everything: ${BOLD}bash scripts/dev.sh${RESET}"
+echo -e "    ${GREEN}2.${RESET} Start everything: ${BOLD}bash dev.sh${RESET}"
 echo -e "    ${GREEN}3.${RESET} Open: ${CYAN}http://localhost:3000${RESET}"
 echo ""

@@ -8,6 +8,7 @@ load_dotenv()
 
 from api.sessions import router as sessions_router
 from api.tts import router as tts_router
+from api.technical import router as technical_router
 
 
 @asynccontextmanager
@@ -33,6 +34,7 @@ app.add_middleware(
 
 app.include_router(sessions_router, prefix="/sessions", tags=["sessions"])
 app.include_router(tts_router, prefix="/tts", tags=["tts"])
+app.include_router(technical_router, prefix="/sessions", tags=["technical"])
 
 
 @app.get("/health")

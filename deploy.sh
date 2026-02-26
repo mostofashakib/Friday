@@ -19,7 +19,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="$ROOT/backend"
 FRONTEND_DIR="$ROOT/frontend"
 
@@ -102,7 +102,7 @@ deploy_backend() {
 
   # Load .env for secrets
   if [[ ! -f "$BACKEND_DIR/.env" ]]; then
-    err "backend/.env not found. Run: bash scripts/setup.sh"
+    err "backend/.env not found. Run: bash setup.sh"
   fi
   # shellcheck source=/dev/null
   source "$BACKEND_DIR/.env"
