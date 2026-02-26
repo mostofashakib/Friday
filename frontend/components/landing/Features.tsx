@@ -1,69 +1,111 @@
-import { Card, CardContent } from "@/components/ui/card";
+"use client";
+
 import { Brain, Mic, TrendingUp, Zap, Target, Shield } from "lucide-react";
 
 const features = [
   {
     icon: Brain,
     title: "Adaptive Difficulty",
-    description:
-      "Friday calibrates question difficulty in real time based on your performance. Nail an answer? Questions get harder. Struggle? It adjusts to build your confidence.",
+    description: "Friday calibrates in real time. Nail an answer and questions get harder. Struggle, and it rebuilds your confidence before moving on.",
+    color: "#0A84FF",
   },
   {
     icon: Target,
-    title: "Gap Detection via RAG",
-    description:
-      "Our retrieval-augmented pipeline analyzes your prior responses to detect recurring knowledge gaps and surfaces targeted follow-up questions to close them.",
+    title: "RAG Gap Detection",
+    description: "Every answer is embedded and stored. The follow-up agent searches your history to surface questions that target recurring weak spots.",
+    color: "#5E5CE6",
   },
   {
     icon: Mic,
-    title: "Voice-First Interaction",
-    description:
-      "Speak your answers naturally. Friday listens, transcribes in real time, and responds with a human-like voice — just like a real interview.",
+    title: "Voice-First",
+    description: "Speak naturally. Friday transcribes in real time with the Web Speech API and responds in a calm, clear voice via ElevenLabs TTS.",
+    color: "#30D158",
   },
   {
     icon: Zap,
-    title: "Instant Coaching",
-    description:
-      "After every answer, you get a score (1–5), specific strengths and gaps, and a one-line coaching insight you can act on immediately.",
+    title: "Instant Feedback",
+    description: "Every answer gets a score 1–5, identified competency, specific strengths and gaps, and a one-line coaching note.",
+    color: "#FFD60A",
   },
   {
     icon: TrendingUp,
     title: "Competency Tracking",
-    description:
-      "Friday tracks your performance across competencies — problem-solving, communication, technical depth — and shows your progress over time.",
+    description: "Rolling averages across problem-solving, communication, and technical depth — tracked per session and surfaced in your report.",
+    color: "#FF6B6B",
   },
   {
     icon: Shield,
-    title: "Multi-Agent Intelligence",
-    description:
-      "Four specialized AI agents — Interviewer, Grader, Follow-up, and Coach — collaborate through a shared session memory to run a coherent, calibrated interview.",
+    title: "4-Agent Loop",
+    description: "Interviewer, Grader, Follow-up, and Coach agents run in a shared LangGraph session, each with a distinct role and memory access.",
+    color: "#FF9F0A",
   },
 ];
 
 export default function Features() {
   return (
-    <section className="py-20 px-4" id="features">
+    <section className="py-28 px-6" id="features">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Everything you need to interview with confidence
+        {/* Header */}
+        <div className="text-center mb-16 max-w-2xl mx-auto">
+          <p className="text-[13px] font-medium mb-4 tracking-wide uppercase"
+            style={{ color: "#0A84FF", letterSpacing: "0.08em" }}>
+            Why Friday
+          </p>
+          <h2
+            className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold leading-tight tracking-tight mb-4"
+            style={{
+              background: "linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.7) 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+          >
+            Everything you need to ace your interview with confidence
           </h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Friday isn&apos;t a question bank. It&apos;s a dynamic interview simulation built
-            on state-of-the-art multi-agent AI.
+          <p className="text-base leading-relaxed" style={{ color: "rgba(245,245,247,0.45)" }}>
+            Friday isn&apos;t a question bank. It&apos;s a simulation built on state-of-the-art multi-agent AI.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature) => (
-            <Card key={feature.title} className="hover:shadow-md transition-shadow">
-              <CardContent className="pt-6">
-                <feature.icon className="h-8 w-8 text-primary mb-4" />
-                <h3 className="font-semibold text-lg mb-2">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm leading-relaxed">
-                  {feature.description}
-                </p>
-              </CardContent>
-            </Card>
+
+        {/* Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {features.map((f, i) => (
+            <div
+              key={f.title}
+              className="group rounded-2xl p-6 transition-all duration-300 cursor-default"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.06)",
+                animationDelay: `${i * 75}ms`,
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.05)";
+                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.1)";
+                (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.03)";
+                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.06)";
+                (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
+              }}
+            >
+              {/* Icon */}
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center mb-5"
+                style={{
+                  background: `${f.color}14`,
+                  border: `1px solid ${f.color}22`,
+                }}
+              >
+                <f.icon size={18} style={{ color: f.color }} />
+              </div>
+              <h3 className="text-[15px] font-semibold mb-2" style={{ color: "rgba(255,255,255,0.9)" }}>
+                {f.title}
+              </h3>
+              <p className="text-[13.5px] leading-relaxed" style={{ color: "rgba(245,245,247,0.45)" }}>
+                {f.description}
+              </p>
+            </div>
           ))}
         </div>
       </div>

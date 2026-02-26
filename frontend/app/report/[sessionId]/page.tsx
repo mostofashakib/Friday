@@ -5,13 +5,15 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import TranscriptPanel from "@/components/interview/TranscriptPanel";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { getReport } from "@/lib/api";
 import type { ReportResponse } from "@/types";
+
+const scoreColor = (s: number) =>
+  s >= 4 ? "#30D158" : s >= 3 ? "#FF9F0A" : "#FF453A";
+const scoreBg = (s: number) =>
+  s >= 4 ? "rgba(48,209,88,0.1)" : s >= 3 ? "rgba(255,159,10,0.1)" : "rgba(255,69,58,0.1)";
+const scoreLabel = (s: number) =>
+  s >= 4 ? "Strong" : s >= 3 ? "Solid" : "Needs work";
 
 export default function ReportPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -30,8 +32,16 @@ export default function ReportPage() {
     return (
       <>
         <Navbar />
-        <main className="min-h-screen bg-background pt-24 flex items-center justify-center">
-          <p className="text-muted-foreground">Generating your report...</p>
+        <main className="min-h-screen bg-black pt-24 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div
+              className="w-10 h-10 rounded-2xl flex items-center justify-center"
+              style={{ background: "rgba(10,132,255,0.1)", border: "1px solid rgba(10,132,255,0.2)", animation: "glow-pulse 1.5s ease-in-out infinite" }}
+            >
+              <span className="text-lg">📊</span>
+            </div>
+            <p className="text-[14px]" style={{ color: "rgba(255,255,255,0.35)" }}>Generating your report…</p>
+          </div>
         </main>
       </>
     );
@@ -41,124 +51,180 @@ export default function ReportPage() {
     return (
       <>
         <Navbar />
-        <main className="min-h-screen bg-background pt-24 flex items-center justify-center">
-          <p className="text-destructive">{error || "Report not found."}</p>
+        <main className="min-h-screen bg-black pt-24 flex items-center justify-center">
+          <p className="text-[14px]" style={{ color: "#FF453A" }}>{error || "Report not found."}</p>
         </main>
       </>
     );
   }
 
-  const overallPct = Math.round((report.overall_score / 5) * 100);
+  const overall = report.overall_score;
+  const overallPct = Math.min(Math.round((overall / 5) * 100), 100);
+  const typeLabel = report.session.interview_type.charAt(0).toUpperCase() + report.session.interview_type.slice(1);
 
   return (
     <>
       <Navbar />
-      <main className="min-h-screen bg-background pt-20 pb-16 px-4">
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold mb-1">Interview Report</h1>
-            <p className="text-muted-foreground text-sm">
-              {report.session.interview_type.charAt(0).toUpperCase() + report.session.interview_type.slice(1)} interview
-              {report.session.role ? ` · ${report.session.role}` : ""} ·{" "}
-              {report.total_turns} questions answered
+      <div className="fixed inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 50% 35% at 50% 0%, rgba(10,132,255,0.05) 0%, transparent 55%)" }} />
+
+      <main className="relative min-h-screen bg-black pt-20 pb-16 px-4">
+        <div className="max-w-3xl mx-auto space-y-5">
+
+          {/* Header */}
+          <div className="pt-6 pb-2">
+            <div
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider mb-4"
+              style={{ background: "rgba(10,132,255,0.1)", color: "rgba(10,132,255,0.85)", border: "1px solid rgba(10,132,255,0.2)", letterSpacing: "0.06em" }}
+            >
+              Interview complete
+            </div>
+            <h1 className="text-[28px] font-bold text-white tracking-tight mb-1">Your Results</h1>
+            <p className="text-[14px]" style={{ color: "rgba(245,245,247,0.4)" }}>
+              {typeLabel} interview
+              {report.session.role ? ` · ${report.session.role}` : ""}
+              {" · "}{report.total_turns} question{report.total_turns !== 1 ? "s" : ""} answered
             </p>
           </div>
 
-          {/* Overall score */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Overall Performance</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-end gap-3">
-                <span className="text-5xl font-bold">{report.overall_score.toFixed(1)}</span>
-                <span className="text-xl text-muted-foreground mb-1">/5</span>
-                <Badge
-                  variant="outline"
-                  className={`ml-auto ${
-                    report.overall_score >= 4
-                      ? "border-green-500/30 text-green-600"
-                      : report.overall_score >= 3
-                      ? "border-yellow-500/30 text-yellow-600"
-                      : "border-red-500/30 text-red-600"
-                  }`}
-                >
-                  {report.overall_score >= 4
-                    ? "Strong"
-                    : report.overall_score >= 3
-                    ? "Solid"
-                    : "Needs work"}
-                </Badge>
+          {/* Overall score card */}
+          <div
+            className="rounded-2xl p-6"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+          >
+            <p
+              className="text-[11px] font-semibold uppercase tracking-wider mb-5"
+              style={{ color: "rgba(255,255,255,0.3)", letterSpacing: "0.07em" }}
+            >
+              Overall performance
+            </p>
+            <div className="flex items-end gap-4 mb-5">
+              <span className="text-[56px] font-bold leading-none" style={{ color: scoreColor(overall) }}>
+                {overall.toFixed(1)}
+              </span>
+              <span className="text-[20px] mb-1" style={{ color: "rgba(255,255,255,0.25)" }}>/5</span>
+              <div
+                className="ml-auto px-3 py-1 rounded-full text-[12px] font-semibold"
+                style={{ background: scoreBg(overall), color: scoreColor(overall), border: `1px solid ${scoreColor(overall)}22` }}
+              >
+                {scoreLabel(overall)}
               </div>
-              <Progress value={overallPct} className="h-2" />
-            </CardContent>
-          </Card>
+            </div>
+            {/* Progress bar */}
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+              <div
+                className="h-full rounded-full transition-all duration-1000"
+                style={{ width: `${overallPct}%`, background: `linear-gradient(90deg, #0A84FF, ${scoreColor(overall)})` }}
+              />
+            </div>
+          </div>
 
           {/* Competency breakdown */}
           {report.competency_scores.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Competency Breakdown</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
+            <div
+              className="rounded-2xl p-6"
+              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}
+            >
+              <p
+                className="text-[11px] font-semibold uppercase tracking-wider mb-5"
+                style={{ color: "rgba(255,255,255,0.3)", letterSpacing: "0.07em" }}
+              >
+                Competency breakdown
+              </p>
+              <div className="space-y-4">
                 {report.competency_scores
                   .sort((a, b) => b.score - a.score)
-                  .map((c) => (
-                    <div key={c.competency} className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium capitalize">{c.competency}</span>
-                        <span className="text-muted-foreground">
-                          {Number(c.score).toFixed(1)}/5 · {c.attempts} answer{c.attempts !== 1 ? "s" : ""}
-                        </span>
+                  .map((c) => {
+                    const pct = Math.min(Math.round((c.score / 5) * 100), 100);
+                    const col = scoreColor(c.score);
+                    return (
+                      <div key={c.competency} className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[13px] font-medium capitalize" style={{ color: "rgba(255,255,255,0.75)" }}>
+                            {c.competency}
+                          </span>
+                          <span className="text-[12px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+                            {Number(c.score).toFixed(1)}/5
+                            <span className="ml-1.5" style={{ color: "rgba(255,255,255,0.2)" }}>
+                              · {c.attempts} answer{c.attempts !== 1 ? "s" : ""}
+                            </span>
+                          </span>
+                        </div>
+                        <div className="h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{ width: `${pct}%`, background: col }}
+                          />
+                        </div>
                       </div>
-                      <Progress value={Math.round((c.score / 5) * 100)} className="h-1.5" />
-                    </div>
-                  ))}
-              </CardContent>
-            </Card>
+                    );
+                  })}
+              </div>
+            </div>
           )}
 
-          {/* Coaching notes */}
+          {/* Coaching insights */}
           {report.coaching_notes.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Coaching Insights</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3">
-                  {report.coaching_notes.map((note, i) => (
-                    <li key={i} className="flex gap-3 text-sm">
-                      <span className="text-primary font-bold shrink-0">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
-                      <p className="leading-relaxed">{note}</p>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
+            <div
+              className="rounded-2xl p-6"
+              style={{ background: "rgba(94,92,230,0.05)", border: "1px solid rgba(94,92,230,0.12)" }}
+            >
+              <p
+                className="text-[11px] font-semibold uppercase tracking-wider mb-5"
+                style={{ color: "rgba(94,92,230,0.7)", letterSpacing: "0.07em" }}
+              >
+                Coaching insights
+              </p>
+              <ul className="space-y-4">
+                {report.coaching_notes.map((note, i) => (
+                  <li key={i} className="flex gap-4">
+                    <span
+                      className="text-[13px] font-bold shrink-0 w-6 text-right"
+                      style={{ color: "rgba(94,92,230,0.5)" }}
+                    >
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <p className="text-[13px] leading-relaxed" style={{ color: "rgba(245,245,247,0.65)" }}>{note}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
-          <Separator />
+          {/* Divider */}
+          <div style={{ height: "1px", background: "rgba(255,255,255,0.06)" }} />
 
           {/* Full transcript */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Full Transcript</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TranscriptPanel messages={report.messages} />
-            </CardContent>
-          </Card>
+          <div
+            className="rounded-2xl p-6"
+            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
+          >
+            <p
+              className="text-[11px] font-semibold uppercase tracking-wider mb-4"
+              style={{ color: "rgba(255,255,255,0.25)", letterSpacing: "0.07em" }}
+            >
+              Full transcript
+            </p>
+            <TranscriptPanel messages={report.messages} />
+          </div>
 
-          <div className="flex gap-3 pt-2">
-            <Link href="/interview/setup">
-              <Button>Practice again</Button>
+          {/* Actions */}
+          <div className="flex gap-3 pt-1">
+            <Link
+              href="/interview/setup"
+              className="flex-1 py-3 rounded-2xl text-[14px] font-semibold text-white text-center transition-all duration-200 active:scale-[0.99]"
+              style={{ background: "#0A84FF", boxShadow: "0 0 0 1px rgba(10,132,255,0.3), 0 4px 20px rgba(10,132,255,0.25)" }}
+            >
+              Practice again
             </Link>
-            <Link href="/">
-              <Button variant="outline">Back to home</Button>
+            <Link
+              href="/"
+              className="flex-1 py-3 rounded-2xl text-[14px] font-semibold text-center transition-all duration-200"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
+            >
+              Back to home
             </Link>
           </div>
+
         </div>
       </main>
     </>
