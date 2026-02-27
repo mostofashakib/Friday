@@ -67,7 +67,7 @@ async def interviewer_node(state: InterviewState) -> dict:
     else:
         context = _build_context(state)
         response = _client.messages.create(
-            model="claude-opus-4-6",
+            model="claude-haiku-4-5-20251001",
             max_tokens=512,
             system=system,
             messages=[{"role": "user", "content": context}],

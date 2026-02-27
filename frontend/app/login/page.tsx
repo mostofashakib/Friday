@@ -26,9 +26,9 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-6">
+    <div className="min-h-screen bg-black flex items-center justify-center px-6 cursor-pointer" onClick={() => router.back()}>
       <div className="fixed inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(10,132,255,0.07) 0%, transparent 60%)" }} />
-      <div className="relative w-full max-w-sm animate-scale-in">
+      <div className="relative w-full max-w-sm animate-scale-in cursor-default" onClick={(e) => e.stopPropagation()}>
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0A84FF, #5E5CE6)", boxShadow: "0 4px 16px rgba(10,132,255,0.3)" }}>

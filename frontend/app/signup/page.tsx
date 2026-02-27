@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
 
 export default function SignupPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -24,9 +26,9 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center px-6">
+      <div className="min-h-screen bg-black flex items-center justify-center px-6 cursor-pointer" onClick={() => router.back()}>
         <div className="fixed inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(10,132,255,0.07) 0%, transparent 60%)" }} />
-        <div className="relative w-full max-w-sm text-center animate-scale-in">
+        <div className="relative w-full max-w-sm text-center animate-scale-in cursor-default" onClick={(e) => e.stopPropagation()}>
           <div className="w-16 h-16 rounded-2xl mx-auto mb-6 flex items-center justify-center" style={{ background: "rgba(48,209,88,0.1)", border: "1px solid rgba(48,209,88,0.2)" }}>
             <span className="text-2xl">✓</span>
           </div>
@@ -41,9 +43,9 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-6">
+    <div className="min-h-screen bg-black flex items-center justify-center px-6 cursor-pointer" onClick={() => router.back()}>
       <div className="fixed inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(10,132,255,0.07) 0%, transparent 60%)" }} />
-      <div className="relative w-full max-w-sm animate-scale-in">
+      <div className="relative w-full max-w-sm animate-scale-in cursor-default" onClick={(e) => e.stopPropagation()}>
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0A84FF, #5E5CE6)", boxShadow: "0 4px 16px rgba(10,132,255,0.3)" }}>
