@@ -118,7 +118,7 @@ sleep 2
 log "Starting frontend on ${GREEN}http://localhost:3000${RESET}"
 (
   cd "$FRONTEND_DIR"
-  npm run dev 2>&1
+  NODE_OPTIONS="--no-deprecation" npm run dev 2>&1
 ) | frontend_log &
 FRONTEND_PID=$!
 

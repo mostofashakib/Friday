@@ -1,8 +1,5 @@
 from __future__ import annotations
-import asyncio
-import base64
-import os
-import httpx
+from tools.tts_manager import get_tts
 
 # In-memory interrupt flags per session
 _interrupt_flags: dict[str, bool] = {}
@@ -22,45 +19,18 @@ def is_interrupted(session_id: str) -> bool:
 
 async def generate_tts(text: str, session_id: str) -> str | None:
     """
-    Generate TTS audio using ElevenLabs.
-    Returns base64-encoded MP3 audio, or None on failure / interrupt.
-    Falls back gracefully so callers always get text even without audio.
+    Generate TTS audio via the configured provider.
+    Returns base64-encoded MP3, or None on failure or interrupt.
     """
     clear_interrupt(session_id)
-    api_key = os.getenv("ELEVENLABS_API_KEY", "")
-    if not api_key:
+    manager = get_tts()
+    audio = await manager.synthesize(text, session_id)
+    if is_interrupted(session_id):
         return None
-
-    voice_id = "EXAVITQu4vr4xnSDxMaL"  # Rachel — clear, professional
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-
-    headers = {
-        "xi-api-key": api_key,
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
-    }
-    payload = {
-        "text": text,
-        "model_id": "eleven_turbo_v2",
-        "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(url, headers=headers, json=payload)
-            if response.status_code != 200:
-                return None
-
-            if is_interrupted(session_id):
-                return None
-
-            audio_bytes = response.content
-            return base64.b64encode(audio_bytes).decode("utf-8")
-    except Exception:
-        return None
+    return audio
 
 
-# Anthropic tool schema definition (swappable when Anthropic ships TTS)
+# Anthropic tool schema definition
 TTS_TOOL_SCHEMA = {
     "name": "generate_speech",
     "description": (

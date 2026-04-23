@@ -1,17 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import QuestionCard from "@/components/interview/QuestionCard";
-import AudioRecorder from "@/components/interview/AudioRecorder";
-import TTSPlayer from "@/components/interview/TTSPlayer";
 import TranscriptPanel from "@/components/interview/TranscriptPanel";
 import DifficultyMeter from "@/components/interview/DifficultyMeter";
-import { getHistory, submitTurn } from "@/lib/api";
+import VoiceOrb from "@/components/interview/VoiceOrb";
+import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
+import { getHistory, submitTurn, interruptTTS, synthesizeTTS } from "@/lib/api";
 import type { Message, Grading } from "@/types";
 
 const MAX_TURNS = 8;
+
+function base64ToBlob(base64: string, mime: string): Blob {
+  const bytes = atob(base64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
 
 export default function InterviewSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -21,7 +28,6 @@ export default function InterviewSessionPage() {
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [currentTurn, setCurrentTurn] = useState(1);
   const [difficulty, setDifficulty] = useState(3);
-  const [ttsAudio, setTtsAudio] = useState<string | null>(null);
   const [isFollowup, setIsFollowup] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
@@ -30,12 +36,32 @@ export default function InterviewSessionPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasPlayedIntroRef = useRef(false);
+
+  const recorder = useVoiceRecorder({
+    sessionId,
+    onSubmit: handleAnswer,
+  });
+
+  // Derived orb state — single source of truth
+  const orbState = submitting
+    ? "idle"
+    : ttsPlaying
+    ? "ai-speaking"
+    : recorder.recorderState === "listening"
+    ? "user-speaking"
+    : recorder.recorderState === "countdown"
+    ? "countdown"
+    : "idle";
+
   useEffect(() => {
     async function load() {
+      let lastInterviewer: Message | undefined;
       try {
         const { messages: msgs } = await getHistory(sessionId);
         setMessages(msgs);
-        const lastInterviewer = [...msgs].reverse().find((m) => m.role === "interviewer");
+        lastInterviewer = [...msgs].reverse().find((m) => m.role === "interviewer");
         if (lastInterviewer) {
           setCurrentQuestion(lastInterviewer.content);
           setCurrentTurn(lastInterviewer.turn_number);
@@ -46,11 +72,56 @@ export default function InterviewSessionPage() {
       } finally {
         setLoading(false);
       }
+
+      if (!lastInterviewer || hasPlayedIntroRef.current) return;
+      hasPlayedIntroRef.current = true;
+
+      const isFirstQuestion = lastInterviewer.turn_number === 1 && !lastInterviewer.is_followup;
+      const ttsText = isFirstQuestion
+        ? `Hi, my name is Friday. I'm your AI interview coach for today's session. I'll be asking you a series of questions and providing feedback on your responses to help you improve. Let's get started with your first question. ${lastInterviewer.content}`
+        : lastInterviewer.content;
+
+      try {
+        const { audio } = await synthesizeTTS(ttsText, sessionId);
+        playTTS(audio);
+      } catch {
+        playTTS(null);
+      }
     }
     load();
   }, [sessionId]);
 
+  function playTTS(ttsAudio: string | null) {
+    if (!ttsAudio) {
+      // No audio — go straight to recording
+      void recorder.start();
+      return;
+    }
+    const blob = base64ToBlob(ttsAudio, "audio/mpeg");
+    const url = URL.createObjectURL(blob);
+    const el = new Audio(url);
+    audioRef.current = el;
+    setTtsPlaying(true);
+
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      setTtsPlaying(false);
+      void recorder.start();
+    };
+    el.onended = cleanup;
+    el.onerror = cleanup;
+    el.play().catch(cleanup);
+  }
+
+  async function handleOrbInterrupt() {
+    audioRef.current?.pause();
+    setTtsPlaying(false);
+    await interruptTTS(sessionId);
+    void recorder.start();
+  }
+
   async function handleAnswer(answer: string) {
+    if (!answer.trim()) return;
     setSubmitting(true);
     setError("");
     try {
@@ -93,8 +164,7 @@ export default function InterviewSessionPage() {
         setCurrentTurn(result.turn);
         setDifficulty(result.difficulty);
         setIsFollowup(result.is_followup);
-        setTtsAudio(result.tts_audio);
-        setTtsPlaying(!!result.tts_audio);
+        playTTS(result.tts_audio);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to submit answer");
@@ -150,6 +220,13 @@ export default function InterviewSessionPage() {
               </div>
             </div>
 
+            {/* Hero orb */}
+            <div className="card-gb-subtle">
+              <div className="card-gb-subtle-inner px-5 py-6 flex flex-col items-center">
+                <VoiceOrb state={orbState} onInterrupt={handleOrbInterrupt} />
+              </div>
+            </div>
+
             {/* Current question */}
             {currentQuestion && (
               <QuestionCard
@@ -160,17 +237,50 @@ export default function InterviewSessionPage() {
               />
             )}
 
-            {/* TTS player */}
-            {(ttsAudio || ttsPlaying) && (
-              <TTSPlayer
-                audio={ttsAudio}
-                text={currentQuestion}
-                sessionId={sessionId}
-                onPlaybackEnd={() => setTtsPlaying(false)}
-              />
+            {/* Live transcript */}
+            {(orbState === "user-speaking" || orbState === "countdown") && recorder.liveTranscript && (
+              <div className="card-gb-subtle">
+                <div className="card-gb-subtle-inner px-5 py-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-dimmer" style={{ letterSpacing: "0.07em" }}>
+                    Your words
+                  </p>
+                  <p className="text-[13px] leading-relaxed" style={{ color: "rgba(245,245,247,0.7)" }}>
+                    {recorder.liveTranscript}
+                  </p>
+                </div>
+              </div>
             )}
 
-            {/* Last grading feedback */}
+            {/* Countdown strip */}
+            {orbState === "countdown" && (
+              <div
+                className="flex items-center gap-3 px-5 py-3 rounded-xl"
+                style={{ background: "rgba(255,159,10,0.07)", border: "1px solid rgba(255,159,10,0.15)" }}
+              >
+                <div className="flex-1 h-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${(recorder.countdownSeconds / 5) * 100}%`,
+                      background: "#FF9F0A",
+                    }}
+                  />
+                </div>
+                <span className="text-[12px] font-semibold tabular-nums" style={{ color: "rgba(255,159,10,0.9)" }}>
+                  {recorder.countdownSeconds}s
+                </span>
+                <button
+                  type="button"
+                  onClick={recorder.cancel}
+                  className="text-[12px] font-medium px-3 py-1 rounded-lg transition-all"
+                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
+                >
+                  Keep talking
+                </button>
+              </div>
+            )}
+
+            {/* Coach feedback */}
             {lastGrading && (
               <div className="card-gb-purple">
                 <div className="card-gb-purple-inner px-5 py-4 space-y-2.5">
@@ -205,29 +315,22 @@ export default function InterviewSessionPage() {
               </div>
             )}
 
-            {/* Answer input */}
-            <div className="card-gb-subtle">
-              <div className="card-gb-subtle-inner px-5 py-5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider mb-3 text-dimmer" style={{ letterSpacing: "0.07em" }}>
-                  Your answer
-                </p>
-                <AudioRecorder onSubmit={handleAnswer} disabled={submitting || ttsPlaying} />
+            {/* Submitting indicator */}
+            {submitting && (
+              <p className="text-[12px] text-accent" style={{ animation: "glow-pulse 1.5s ease-in-out infinite" }}>
+                Friday is reviewing your answer…
+              </p>
+            )}
 
-                {submitting && (
-                  <p className="text-[12px] mt-3 text-accent" style={{ animation: "glow-pulse 1.5s ease-in-out infinite" }}>
-                    Friday is reviewing your answer…
-                  </p>
-                )}
-                {error && (
-                  <p
-                    className="text-[12px] mt-3 rounded-xl px-3 py-2"
-                    style={{ color: "#FF6B6B", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.15)" }}
-                  >
-                    {error}
-                  </p>
-                )}
-              </div>
-            </div>
+            {/* General error */}
+            {error && (
+              <p
+                className="text-[12px] rounded-xl px-3 py-2"
+                style={{ color: "#FF6B6B", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.15)" }}
+              >
+                {error}
+              </p>
+            )}
 
           </div>
         </div>

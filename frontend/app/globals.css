@@ -127,6 +127,9 @@
 @keyframes shimmer { 0% { background-position: -200% center; } 100% { background-position: 200% center; } }
 @keyframes float { 0%,100% { transform: translateY(0px); } 50% { transform: translateY(-12px); } }
 @keyframes shimmer-gb { 0% { background-position: 0% center; } 100% { background-position: 200% center; } }
+@keyframes orb-breathe      { 0%,100% { transform: scale(1);    filter: brightness(1);    } 50% { transform: scale(1.12); filter: brightness(1.15); } }
+@keyframes orb-breathe-fast { 0%,100% { transform: scale(1);    filter: brightness(1);    } 50% { transform: scale(1.18); filter: brightness(1.20); } }
+@keyframes orb-idle-float   { 0%,100% { transform: scale(1) translateY(0);    } 50% { transform: scale(1.03) translateY(-2px); } }
 
 @layer utilities {
   .animate-fade-up    { animation: fade-up   0.6s cubic-bezier(0.16, 1, 0.3, 1) both; }
