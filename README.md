@@ -2,19 +2,15 @@
 
 # Friday — AI Mock Interview Coach
 
-**The open-source AI-powered interview coach that adapts to you.**
+**Adaptive AI-powered behavioral interview practice with real-time coaching, voice interaction, and personalized candidate profiling.**
 
-[![GitHub Stars](https://img.shields.io/github/stars/yourusername/friday?style=social)](https://github.com/yourusername/friday)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
-[![Next.js 15](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)](https://nextjs.org)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=next.js&logoColor=white)](https://nextjs.org)
 [![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude%20AI-orange)](https://anthropic.com)
 [![LangGraph](https://img.shields.io/badge/Multi--Agent-LangGraph-green)](https://langchain-ai.github.io/langgraph/)
-[![Deploy on Vercel](https://img.shields.io/badge/Deploy-Vercel-black?logo=vercel)](https://vercel.com)
 
-Practice behavioral interviews, technical interviews, and role-based interviews with an AI coach that listens, adapts, and never lets you off easy.
-
-[Get Started](#getting-started) · [Features](#features) · [Architecture](#architecture) · [Deploy](#deployment) · [Contributing](#contributing)
+[Features](#features) · [Architecture](#architecture) · [Getting Started](#getting-started) · [API Reference](#api-reference) · [Deployment](#deployment)
 
 </div>
 
@@ -22,166 +18,253 @@ Practice behavioral interviews, technical interviews, and role-based interviews 
 
 ## What is Friday?
 
-**Friday** is a full-stack, open-source **AI mock interview simulator** built with a stateful multi-agent loop (LangGraph + Claude), a RAG pipeline for detecting knowledge gaps, and a voice-first interface (TTS + STT). It's the closest thing to a real interview — without the nerves of having a human judge you.
+**Friday** is a full-stack AI mock interview simulator built on a stateful multi-agent pipeline (LangGraph + Claude). It conducts adaptive behavioral interviews, grades every answer in real time, detects recurring knowledge gaps via RAG, and gives specific per-turn coaching feedback — all with voice-first interaction.
 
-Whether you're preparing for a **FAANG technical interview**, a **behavioral interview at a startup**, or a **senior engineering role**, Friday adapts to your skill level in real time and tells you exactly where you're falling short.
-
-> Built with: **Anthropic Claude** · **LangGraph** · **FastAPI** · **Next.js 15** · **Supabase** · **ElevenLabs TTS** · **Vercel** · **GCP Cloud Run**
-
----
-
-## Table of Contents
-
-- [Features](#features)
-- [Demo](#demo)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Quick Setup](#quick-setup)
-  - [Running Locally](#running-locally)
-- [Scripts Reference](#scripts-reference)
-- [API Reference](#api-reference)
-- [Database Schema](#database-schema)
-- [Deployment](#deployment)
-- [Environment Variables](#environment-variables)
-- [Contributing](#contributing)
-- [License](#license)
+> Built with: **Anthropic Claude** · **LangGraph** · **FastAPI** · **Next.js 14** · **Supabase pgvector** · **ElevenLabs TTS**
 
 ---
 
 ## Features
 
-### Adaptive Multi-Agent Interview Loop
+### Five-Agent Interview Pipeline
 
-Friday runs a **stateful LangGraph pipeline** with four specialized AI agents that share session memory and collaborate to run a coherent, calibrated interview:
+Friday runs a stateful LangGraph pipeline where five specialized AI agents share session memory and collaborate to run a coherent, calibrated interview:
 
-| Agent | Role |
-|-------|------|
-| **Interviewer** | Generates calibrated questions using Claude Opus. Adjusts complexity dynamically based on your performance history. |
-| **Grader** | Evaluates every answer with Claude Sonnet. Outputs a structured score (1–5), identified competency, strengths, and specific gaps. |
-| **Follow-up** | Queries a RAG vector store of your prior responses to detect recurring weaknesses. Triggers targeted follow-up questions when gaps are found. |
-| **Coach** | Produces per-turn coaching insights with Claude Haiku. Adjusts the session difficulty up or down based on rolling competency scores. |
+| Agent | Trigger | Role |
+|-------|---------|------|
+| **Interviewer** | Start + after each graded turn | Selects calibrated questions from the curated bank using `search_question_bank` and `get_competency_history` tools. Follows Coach directives. |
+| **Grader** | Every user answer | Scores the answer 1–5, identifies competency, lists strengths and gaps. Feeds into routing. |
+| **Clarifier** | Score ≤ 2 | Generates a probing follow-up that tests foundational understanding of the weak area. |
+| **Followup** | Score 3–4 | Runs RAG similarity search over prior answers. Triggers a targeted follow-up when recurring gaps are found. |
+| **Coach** | After grading (most turns) | Bans saturated competencies, sets directives for the Interviewer, flags anomalies for human review, and produces a concise coaching note. |
 
-### RAG-Powered Gap Detection
+### Conditional Agent Routing
 
-Every answer you give is embedded (OpenAI `text-embedding-3-small`) and stored in **Supabase pgvector**. Before generating each follow-up, the Follow-up agent performs a **semantic similarity search** over your prior Q&A history to:
+```
+Answer submitted
+      │
+      ▼
+   Grader
+      │
+   score?
+   ├─ 1–2 ──▶ Clarifier ──▶ Coach ──▶ Interviewer (probe question)
+   ├─ 3–4 ──▶ Followup ──▶ (gap found?) ──▶ Interviewer (immediate follow-up)
+   │                      └─ (no gap)  ──▶ Coach ──▶ Interviewer (next question)
+   └─ 5   ─────────────────────────────▶ Coach ──▶ Interviewer (harder question)
+```
 
-- Detect recurring topics you've struggled with
-- Surface questions that target your weakest competencies
-- Prevent easy topics from dominating the session
+### Agent Tool Use
+
+Agents call structured tools mid-reasoning:
+
+**Interviewer tools:**
+- `search_question_bank(competency, difficulty)` — retrieves a curated question from the 135-question bank (9 competencies × 5 levels)
+- `get_competency_history(competency)` — reads rolling score and attempt count before picking a topic
+
+**Coach tools:**
+- `ban_competency(competency, reason)` — marks a topic as saturated; Interviewer skips it
+- `set_directive(directive)` — writes a specific instruction the Interviewer must follow next turn
+- `flag_for_human_review(reason, severity)` — escalates the session when anomalies are detected
+
+### Coach-Driven Session State
+
+The Coach mutates live session state that the Interviewer reads every turn:
+
+```python
+banned_competencies: list[str]   # topics Interviewer must skip
+question_budget: dict[str, int]  # remaining questions per competency (auto-bans at 0)
+coach_directives: list[str]      # explicit instructions consumed by next Interviewer call
+```
+
+### Personalized Candidate Context
+
+Before the first question, Friday builds a candidate profile from up to four sources concurrently:
+
+| Source | Tool | What it does |
+|--------|------|-------------|
+| **GitHub username** | `tools/github.py` | Fetches all repos, LLM-summarizes each, creates a condensed engineering profile |
+| **Google Scholar name** | `tools/scholar.py` | Pulls publications via `scholarly`, summarizes research background |
+| **Resume file** | `tools/resume.py` | Extracts text from PDF (`pypdf`) or plain text, LLM-summarizes |
+| **Job posting URL** | `tools/job_scraper.py` | Fetches page with `httpx`, strips HTML with BeautifulSoup, extracts role requirements |
+
+All context is injected into the Interviewer's system prompt so questions are anchored to the candidate's actual background.
+
+### Multi-Provider LLM Support
+
+```python
+# backend/llm/manager.py
+# Default: Anthropic Claude. Swap via LLM_PROVIDER env var.
+# Supported: anthropic | openai | google | ollama
+```
+
+All providers use the same `complete()` and `complete_with_tools()` interface. Tool-use loops (call → execute → feed results → repeat) are native on Anthropic; other providers fall back to plain completion.
+
+### RAG Gap Detection
+
+Every answer is embedded (OpenAI `text-embedding-3-small`) and stored in Supabase pgvector. Before generating a follow-up, the Followup agent runs a semantic similarity search over the session's prior Q&A to detect recurring weak areas and prevent easy topics from dominating.
+
+### Developer Debugging — `agent_trace`
+
+Every `/turn` response includes a per-turn decision log:
+
+```json
+"agent_trace": [
+  { "node": "grader",      "decision": "score=3, competency=problem_solving" },
+  { "node": "router",      "decision": "score=3 → routing to followup" },
+  { "node": "followup",    "decision": "RAG gap detected on 'problem_solving', triggering targeted question" },
+  { "node": "router",      "decision": "followup → interviewer" },
+  { "node": "interviewer", "decision": "serving follow-up question immediately" }
+]
+```
 
 ### Voice-First Interaction
 
-- **TTS**: Questions are spoken aloud using ElevenLabs (`eleven_turbo_v2`) — architected as a callable Anthropic tool with a clean provider interface (ready to swap when Anthropic ships native TTS).
-- **Interrupt handling**: Stop TTS mid-sentence — per-session interrupt flags propagate from frontend button to backend `POST /tts/interrupt`.
-- **STT**: Answers are transcribed in real time using the browser's Web Speech API. Graceful fallback to text input.
+- **TTS**: Questions are synthesized via ElevenLabs (`eleven_turbo_v2`) and returned as base64 MP3 per response
+- **STT**: Answers transcribed in real time via the browser Web Speech API with text-input fallback
+- **Interrupt**: `POST /tts/interrupt` cancels active playback mid-sentence
 
-### Calibrated Difficulty Progression
+### Difficulty Calibration
 
-- 5-level difficulty scale: Entry → Junior → Mid-Level → Senior → Staff/Principal
-- Auto-adjusts upward when your rolling score exceeds 4.0, downward below 2.0
-- Visual difficulty meter with per-competency score tracking
-
-### Interview Modes
-
-- **Behavioral** — STAR-format questions about leadership, conflict resolution, impact, and growth
-- **Technical** — Algorithms, data structures, system design, debugging, and engineering fundamentals
-- **Role-Based** — Custom questions anchored to a target role + job description you provide
-
-### Full Coaching Report
-
-After every session you get:
-- Overall performance score (1–5)
-- Per-competency breakdown with rolling averages
-- Turn-by-turn coaching notes
-- Full searchable transcript with scores and competency tags
-
----
-
-## Demo
-
-> _Screenshots / GIF coming soon. Star the repo to get notified when the hosted demo launches._
+- 5-level scale: Entry → Junior → Mid-Level → Senior → Staff/Principal
+- Auto-adjusts up when rolling average score ≥ 4.0, down when ≤ 2.0
+- Per-competency budget prevents over-testing any single topic
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                          Frontend (Next.js 15)                       │
-│                                                                       │
-│  Landing Page   Interview Setup   Active Session      Report         │
-│  (SEO/GEO opt)  (type/role/diff)  (voice + chat)   (scores/notes)  │
-│                                                                       │
-│  AudioRecorder (Web Speech API)   TTSPlayer (ElevenLabs base64)     │
-│  TranscriptPanel (live Q&A log)   DifficultyMeter (competency viz)  │
-│                                                                       │
-│  Supabase Auth (email/password)   Vercel Analytics                  │
-└───────────────────────────┬─────────────────────────────────────────┘
-                            │ HTTP / REST
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Backend (FastAPI)                             │
-│                                                                       │
-│  POST /sessions          POST /sessions/{id}/start                  │
-│  POST /sessions/{id}/turn  GET /sessions/{id}/report                │
-│  POST /tts               POST /tts/interrupt                        │
-│                                                                       │
-│  ┌─────────────────────────────────────────────────────────────┐    │
-│  │                   LangGraph Agent Loop                       │    │
-│  │                                                               │    │
-│  │  ┌────────────┐    ┌──────────┐    ┌───────────┐            │    │
-│  │  │ Interviewer│───▶│  Grader  │───▶│ Follow-up │            │    │
-│  │  │ (Opus 4.6) │    │(Sonnet   │    │ (RAG +    │            │    │
-│  │  │            │◀───│  4.6)    │    │  Haiku)   │            │    │
-│  │  └────────────┘    └──────────┘    └─────┬─────┘            │    │
-│  │        ▲                                  │                   │    │
-│  │        │           ┌──────────┐           │                   │    │
-│  │        └───────────│  Coach   │◀──────────┘                   │    │
-│  │                    │ (Haiku)  │                               │    │
-│  │                    └──────────┘                               │    │
-│  │                                                               │    │
-│  │            Shared InterviewState (in-memory)                 │    │
-│  └─────────────────────────────────────────────────────────────┘    │
-│                                                                       │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────────┐   │
-│  │  TTS Tool       │  │  RAG Pipeline   │  │  DB Queries      │   │
-│  │  ElevenLabs +   │  │  OpenAI embeds  │  │  Supabase        │   │
-│  │  interrupt flag │  │  pgvector sim   │  │  service role    │   │
-│  └─────────────────┘  └─────────────────┘  └──────────────────┘   │
-└─────────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                       Supabase (PostgreSQL + pgvector)               │
-│                                                                       │
-│   sessions    messages    message_embeddings    competency_scores    │
-│                                                                       │
-│   RLS policies on all tables (user can only access own sessions)     │
-└─────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        Frontend (Next.js 14)                          │
+│                                                                        │
+│   Landing Page    Interview Setup    Active Session    Report          │
+│                   GitHub / Scholar   Voice + Chat     Scores/Notes    │
+│                   Resume / Job URL                                     │
+│                                                                        │
+│   Web Speech API (STT)    ElevenLabs TTS Player    Vercel Analytics   │
+└─────────────────────────────┬────────────────────────────────────────┘
+                              │ HTTP / REST (multipart + JSON)
+                              ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Backend (FastAPI)                             │
+│                                                                        │
+│  POST /sessions          POST /sessions/{id}/start                   │
+│  POST /sessions/{id}/turn  GET /sessions/{id}/report                 │
+│                                                                        │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │                  LangGraph Agent Pipeline                      │    │
+│  │                                                                │    │
+│  │  Interviewer ──▶ Grader ──▶ [Clarifier | Followup] ──▶ Coach │    │
+│  │      ▲_______________________________________________│         │    │
+│  │                                                                │    │
+│  │              Shared InterviewState (in-memory)                 │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                        │
+│  tools/github.py   tools/scholar.py   tools/resume.py                │
+│  tools/job_scraper.py   tools/agent_tools.py (question bank)         │
+│  rag/retriever.py (pgvector)   llm/manager.py (multi-provider)       │
+└─────────────────────────────┬────────────────────────────────────────┘
+                              │
+                              ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│                  Supabase (PostgreSQL + pgvector)                     │
+│                                                                        │
+│   sessions   messages   message_embeddings   competency_scores        │
+│   RLS policies — users access only their own sessions                 │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | Next.js 15 (App Router) | React framework, SSR, routing |
-| **UI** | ShadCN UI + TailwindCSS | Component library + utility-first styling |
-| **Analytics** | Vercel Analytics | Page view and event tracking |
-| **Backend** | FastAPI | High-performance async Python API |
-| **Agent Orchestration** | LangGraph | Stateful multi-agent loop with conditional edges |
-| **LLM** | Anthropic Claude (Opus 4.6, Sonnet 4.6, Haiku 4.5) | Interview generation, grading, coaching |
-| **TTS** | ElevenLabs (`eleven_turbo_v2`) | Text-to-speech synthesis |
-| **STT** | Web Speech API (browser-native) | Real-time speech recognition |
-| **RAG Embeddings** | OpenAI `text-embedding-3-small` | Semantic embedding of Q&A pairs |
-| **Vector Store** | Supabase pgvector | Similarity search for gap detection |
-| **Database** | Supabase (PostgreSQL) | Sessions, messages, competency scores |
-| **Auth** | Supabase Auth | Email/password authentication |
-| **Frontend Hosting** | Vercel | CDN, edge functions, CI/CD |
-| **Backend Hosting** | GCP Cloud Run | Containerized serverless deployment |
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | Next.js 14 App Router, Tailwind CSS v4, TypeScript |
+| **Backend** | FastAPI, Python 3.11+, uvicorn |
+| **Agent Orchestration** | LangGraph (stateful multi-agent with conditional edges) |
+| **LLM** | Anthropic Claude (default) — OpenAI, Google Gemini, Ollama supported |
+| **TTS** | ElevenLabs `eleven_turbo_v2` |
+| **STT** | Web Speech API (browser-native) |
+| **RAG Embeddings** | OpenAI `text-embedding-3-small` |
+| **Vector Store** | Supabase pgvector |
+| **Database** | Supabase (PostgreSQL) |
+| **Auth** | Supabase Auth (bypassable via `AUTH_ENABLED` flag) |
+| **Frontend Hosting** | Vercel |
+| **Backend Hosting** | GCP Cloud Run |
+
+---
+
+## Project Structure
+
+```
+Friday/
+├── dev.sh / kill.sh / setup.sh / deploy.sh
+│
+├── backend/
+│   ├── main.py                  FastAPI app entry point
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   │
+│   ├── agents/
+│   │   ├── state.py             InterviewState TypedDict
+│   │   ├── graph.py             LangGraph graph + routing functions
+│   │   ├── interviewer.py       Question selection with tool use
+│   │   ├── grader.py            Answer scoring (1–5, competency, gaps)
+│   │   ├── clarifier.py         Probing questions for score ≤ 2
+│   │   ├── followup.py          RAG-driven targeted follow-ups
+│   │   └── coach.py             State mutation + coaching notes
+│   │
+│   ├── tools/
+│   │   ├── agent_tools.py       Question bank (135 Q) + tool schemas + executors
+│   │   ├── tts.py               ElevenLabs synthesis + interrupt
+│   │   ├── github.py            GitHub repo fetch + LLM summarization
+│   │   ├── scholar.py           Google Scholar publication lookup
+│   │   ├── resume.py            PDF/text resume extraction
+│   │   └── job_scraper.py       Job posting URL scraper
+│   │
+│   ├── llm/
+│   │   └── manager.py           Multi-provider LLM (Anthropic/OpenAI/Google/Ollama)
+│   │
+│   ├── rag/
+│   │   ├── embeddings.py        OpenAI text-embedding-3-small
+│   │   └── retriever.py         pgvector similarity search
+│   │
+│   ├── db/
+│   │   ├── client.py            Supabase client singleton
+│   │   ├── queries.py           All DB helpers
+│   │   └── schema.sql           Run once in Supabase SQL editor
+│   │
+│   └── api/
+│       ├── sessions.py          Session + turn endpoints
+│       └── tts.py               TTS endpoints
+│
+└── frontend/
+    ├── app/
+    │   ├── layout.tsx            Root layout + SEO metadata + JSON-LD
+    │   ├── page.tsx              Landing page
+    │   ├── globals.css           Design system (glassmorphism tokens)
+    │   ├── robots.ts             robots.txt generation
+    │   ├── sitemap.ts            sitemap.xml generation
+    │   ├── login/page.tsx
+    │   ├── signup/page.tsx
+    │   ├── interview/
+    │   │   ├── setup/page.tsx    Interview configuration + context upload
+    │   │   └── [sessionId]/page.tsx  Active session (voice + chat)
+    │   └── report/
+    │       └── [sessionId]/page.tsx  Post-session coaching report
+    │
+    ├── components/
+    │   ├── landing/              Hero, Features, HowItWorks, CTA
+    │   ├── layout/               Navbar, Footer
+    │   └── interview/            AudioRecorder, TTSPlayer, TranscriptPanel
+    │
+    └── lib/
+        ├── auth-config.ts        AUTH_ENABLED single source of truth
+        ├── api.ts                Backend API client (FormData + JSON)
+        ├── supabase.ts           Supabase browser client
+        └── supabase-server.ts    Supabase server client
+```
 
 ---
 
@@ -189,175 +272,39 @@ After every session you get:
 
 ### Prerequisites
 
-| Tool | Version | Install |
-|------|---------|---------|
-| Python | 3.11+ | [python.org](https://python.org) |
-| Node.js | 18+ | [nodejs.org](https://nodejs.org) |
-| npm | 9+ | Bundled with Node |
-| Google Cloud SDK | Latest | [cloud.google.com/sdk](https://cloud.google.com/sdk) |
-| Vercel CLI | Latest | `npm i -g vercel` |
+| Tool | Version |
+|------|---------|
+| Python | 3.11+ |
+| Node.js | 18+ |
+| npm | 9+ |
 
 ### Quick Setup
-
-The fastest way to get up and running — one script handles everything:
 
 ```bash
 git clone https://github.com/yourusername/friday.git
 cd friday
-bash scripts/setup.sh
+bash setup.sh
 ```
 
-This script will:
-1. Check all required tools are installed
-2. Create Python virtual environment and install backend dependencies
-3. Install frontend Node.js dependencies
-4. Walk you through creating `.env` files for both services
-5. Print the Supabase SQL you need to run in your project dashboard
+The setup script installs backend dependencies into `.venv`, installs frontend npm packages, and walks you through creating `.env` files.
 
 ### Running Locally
 
-After setup, start both frontend and backend with a single command:
+```bash
+bash dev.sh
+```
+
+- **Frontend** → http://localhost:3000
+- **Backend** → http://localhost:8000
+- **API Docs** → http://localhost:8000/docs
 
 ```bash
-bash scripts/dev.sh
+bash kill.sh   # stop both processes
 ```
 
-- **Backend** → [http://localhost:8000](http://localhost:8000)
-- **Frontend** → [http://localhost:3000](http://localhost:3000)
-- **API Docs** → [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
+### Auth Bypass (Development)
 
-To stop all processes:
-
-```bash
-bash scripts/kill.sh
-```
-
----
-
-## Scripts Reference
-
-| Script | What it does |
-|--------|-------------|
-| `bash scripts/setup.sh` | **First-time setup.** Installs all dependencies (Python venv + npm), guides you through filling in API keys, creates `.env` files. |
-| `bash scripts/dev.sh` | **Local development.** Starts backend (FastAPI/uvicorn) and frontend (Next.js) together with unified log output. Ctrl+C stops both. |
-| `bash scripts/kill.sh` | **Process cleanup.** Kills any running uvicorn (port 8000) and Next.js (port 3000) processes. |
-| `bash scripts/deploy.sh` | **Production deployment.** Deploys backend to GCP Cloud Run and frontend to Vercel in sequence. Handles Docker build, push, and `gcloud run deploy`. |
-
----
-
-## API Reference
-
-All endpoints require the `X-User-Id` header (set automatically by the frontend from Supabase Auth session).
-
-### Sessions
-
-```
-POST   /sessions                    Create a new interview session
-POST   /sessions/{id}/start         Get first question (runs Interviewer node)
-POST   /sessions/{id}/turn          Submit answer → grade → follow-up → coach → next question
-GET    /sessions/{id}/report        Full coaching report (scores, notes, transcript)
-GET    /sessions/{id}/history       Raw message history
-```
-
-**`POST /sessions`** body:
-```json
-{
-  "interview_type": "behavioral | technical | general",
-  "role": "Senior Software Engineer (optional)",
-  "difficulty": 3
-}
-```
-
-**`POST /sessions/{id}/turn`** body:
-```json
-{ "answer": "In my previous role at..." }
-```
-
-**`POST /sessions/{id}/turn`** response:
-```json
-{
-  "session_complete": false,
-  "grading": {
-    "score": 4,
-    "competency": "problem-solving",
-    "feedback": "Strong use of the STAR method...",
-    "strengths": ["clear structure", "quantified impact"],
-    "gaps": ["missing stakeholder context"]
-  },
-  "coaching_note": "Next time, mention who was affected by the outcome.",
-  "question": "Tell me about a time you had to make a decision with incomplete information.",
-  "tts_audio": "<base64-encoded MP3>",
-  "turn": 3,
-  "difficulty": 4,
-  "is_followup": false
-}
-```
-
-### TTS
-
-```
-POST   /tts                         Synthesize text to base64 MP3 audio
-POST   /tts/interrupt               Cancel active TTS playback for a session
-```
-
----
-
-## Database Schema
-
-Run `backend/db/schema.sql` in your Supabase project's SQL editor before first launch.
-
-```sql
-sessions             -- Interview sessions (type, role, difficulty, status)
-messages             -- All Q&A turns (role, content, score, competency, is_followup)
-message_embeddings   -- pgvector embeddings for RAG gap detection (vector(1536))
-competency_scores    -- Rolling per-competency scores across a session
-```
-
-Row Level Security is enabled on all tables — users can only access their own sessions.
-
----
-
-## Deployment
-
-### One-Command Deploy
-
-```bash
-bash scripts/deploy.sh
-```
-
-This script handles:
-1. Docker build + push to Google Artifact Registry
-2. `gcloud run deploy` with production environment variables
-3. `vercel --prod` for the frontend
-
-### Manual: Backend → GCP Cloud Run
-
-```bash
-cd backend
-
-# Build and push Docker image
-gcloud builds submit --tag gcr.io/YOUR_PROJECT/friday-backend
-
-# Deploy to Cloud Run
-gcloud run deploy friday-backend \
-  --image gcr.io/YOUR_PROJECT/friday-backend \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars ANTHROPIC_API_KEY=...,SUPABASE_URL=...,...
-```
-
-### Manual: Frontend → Vercel
-
-```bash
-cd frontend
-vercel --prod
-```
-
-Set these environment variables in the Vercel project dashboard:
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `NEXT_PUBLIC_API_URL` (your Cloud Run URL)
+Set `AUTH_ENABLED = false` in `frontend/lib/auth-config.ts` to bypass Supabase Auth entirely. The app routes directly to `/interview/setup` and never checks session tokens.
 
 ---
 
@@ -367,12 +314,13 @@ Set these environment variables in the Vercel project dashboard:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | ✅ | Claude API key — [console.anthropic.com](https://console.anthropic.com) |
-| `ELEVENLABS_API_KEY` | ✅ | ElevenLabs TTS key — [elevenlabs.io](https://elevenlabs.io) |
-| `OPENAI_API_KEY` | ✅ | For `text-embedding-3-small` (RAG) — [platform.openai.com](https://platform.openai.com) |
-| `SUPABASE_URL` | ✅ | Your Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service role key (never expose publicly) |
+| `ANTHROPIC_API_KEY` | ✅ | Claude API key |
+| `ELEVENLABS_API_KEY` | ✅ | ElevenLabs TTS key |
+| `OPENAI_API_KEY` | ✅ | For RAG embeddings (`text-embedding-3-small`) |
+| `SUPABASE_URL` | ✅ | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service role key (server-only) |
 | `CORS_ORIGINS` | ✅ | Comma-separated allowed origins |
+| `LLM_PROVIDER` | ❌ | `anthropic` (default) \| `openai` \| `google` \| `ollama` |
 | `MAX_TURNS` | ❌ | Interview length (default: `8`) |
 
 ### Frontend (`frontend/.env.local`)
@@ -380,106 +328,115 @@ Set these environment variables in the Vercel project dashboard:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Same Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon/public key (safe to expose) |
-| `NEXT_PUBLIC_API_URL` | ✅ | Backend URL (e.g. `http://localhost:8000` or Cloud Run URL) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon key |
+| `NEXT_PUBLIC_API_URL` | ✅ | Backend URL (`http://localhost:8000` or Cloud Run URL) |
+| `NEXT_PUBLIC_SITE_URL` | ❌ | Canonical site URL for SEO (e.g. `https://interviewwithfriday.com`) |
 
 ---
 
-## Project Structure
+## API Reference
+
+All endpoints require the `X-User-Id` header (sent automatically by the frontend).
+
+### Sessions
 
 ```
-Friday/
-├── scripts/
-│   ├── setup.sh          First-time install + .env configuration
-│   ├── dev.sh            Start both services locally
-│   ├── kill.sh           Kill running frontend/backend processes
-│   └── deploy.sh         Deploy to Vercel + GCP Cloud Run
-│
-├── backend/
-│   ├── main.py           FastAPI app + CORS
-│   ├── run.sh            Backend-only dev runner
-│   ├── Dockerfile        GCP Cloud Run container
-│   ├── requirements.txt
-│   ├── agents/
-│   │   ├── state.py      InterviewState TypedDict
-│   │   ├── graph.py      LangGraph graph definition
-│   │   ├── interviewer.py
-│   │   ├── grader.py
-│   │   ├── followup.py
-│   │   └── coach.py
-│   ├── tools/
-│   │   └── tts.py        ElevenLabs TTS tool + interrupt
-│   ├── rag/
-│   │   ├── embeddings.py OpenAI embeddings
-│   │   └── retriever.py  pgvector similarity search
-│   ├── db/
-│   │   ├── client.py     Supabase client singleton
-│   │   ├── queries.py    All DB helpers
-│   │   └── schema.sql    Run once in Supabase SQL editor
-│   └── api/
-│       ├── sessions.py   Session + turn endpoints
-│       └── tts.py        TTS endpoints
-│
-└── frontend/
-    ├── app/
-    │   ├── page.tsx          Landing page (SEO optimized)
-    │   ├── login/page.tsx
-    │   ├── signup/page.tsx
-    │   ├── interview/
-    │   │   ├── setup/page.tsx
-    │   │   └── [sessionId]/page.tsx
-    │   └── report/
-    │       └── [sessionId]/page.tsx
-    ├── components/
-    │   ├── interview/
-    │   │   ├── AudioRecorder.tsx   Web Speech API STT
-    │   │   ├── TTSPlayer.tsx       Audio playback + interrupt
-    │   │   ├── QuestionCard.tsx
-    │   │   ├── TranscriptPanel.tsx
-    │   │   └── DifficultyMeter.tsx
-    │   ├── landing/
-    │   │   ├── Hero.tsx
-    │   │   ├── Features.tsx
-    │   │   ├── HowItWorks.tsx
-    │   │   └── CTA.tsx
-    │   └── layout/
-    │       ├── Navbar.tsx
-    │       └── Footer.tsx
-    ├── lib/
-    │   ├── supabase.ts
-    │   ├── supabase-server.ts
-    │   └── api.ts
-    └── types/
-        └── index.ts
+POST   /sessions                    Create session (multipart/form-data)
+POST   /sessions/{id}/start         Get first question
+POST   /sessions/{id}/turn          Submit answer → full agent pipeline
+GET    /sessions/{id}/report        Coaching report (scores, notes, transcript)
+GET    /sessions/{id}/history       Raw message history
+```
+
+**`POST /sessions`** — multipart form fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `interview_type` | string | `behavioral` |
+| `difficulty` | int | 1–5 |
+| `role` | string | Target job title |
+| `github_username` | string | Optional — GitHub profile context |
+| `scholar_name` | string | Optional — Google Scholar context |
+| `job_url` | string | Optional — job posting URL |
+| `resume` | file | Optional — PDF or text |
+
+**`POST /sessions/{id}/turn`** response:
+
+```json
+{
+  "session_complete": false,
+  "grading": {
+    "score": 3,
+    "competency": "problem_solving",
+    "feedback": "...",
+    "strengths": ["..."],
+    "gaps": ["..."]
+  },
+  "coaching_note": "Next time, quantify the business impact.",
+  "question": "Tell me about a time you had to make a decision with incomplete information.",
+  "tts_audio": "<base64 MP3>",
+  "turn": 3,
+  "difficulty": 3,
+  "is_followup": false,
+  "route": "followup",
+  "human_review_flag": null,
+  "agent_trace": [
+    { "node": "grader",      "decision": "score=3, competency=problem_solving" },
+    { "node": "router",      "decision": "score=3 → routing to followup" },
+    { "node": "followup",    "decision": "no follow-up gaps found, proceeding to coach" },
+    { "node": "coach",       "decision": "rolling avg 3.2, difficulty held at 3, session_complete=False" },
+    { "node": "interviewer", "decision": "selecting next question at difficulty 3" }
+  ]
+}
 ```
 
 ---
 
-## Contributing
+## Database Schema
 
-Contributions are welcome. Here's how to get started:
+Run `backend/db/schema.sql` in the Supabase SQL editor before first launch.
 
-1. Fork the repo and create a feature branch: `git checkout -b feat/your-feature`
-2. Run `bash scripts/setup.sh` to configure your local environment
-3. Make your changes and test with `bash scripts/dev.sh`
-4. Open a pull request with a clear description of the change
+```sql
+sessions             -- Interview sessions (type, role, difficulty, status, timestamps)
+messages             -- All Q&A turns (role, content, score, competency, is_followup)
+message_embeddings   -- pgvector 1536-dim embeddings for RAG gap detection
+competency_scores    -- Rolling per-competency scores within a session
+```
 
-### Ideas for contribution
-
-- [ ] Supabase Realtime session sync (multi-tab support)
-- [ ] Whisper API fallback for STT (higher accuracy)
-- [ ] Session history dashboard (past interviews, trend charts)
-- [ ] Custom question bank uploads (PDF/JD ingestion)
-- [ ] Coding challenge mode (Monaco editor integration)
-- [ ] Vercel AI SDK streaming responses
-- [ ] Mobile-responsive voice recorder improvements
-- [ ] Redis-backed session state (replace in-memory dict for multi-instance deployments)
+Row Level Security is enabled on all tables.
 
 ---
 
-## Keywords
+## Deployment
 
-> _AI interview coach · AI mock interview · interview preparation AI · LangGraph multi-agent · behavioral interview practice · technical interview prep · STAR format interview · voice interview simulator · adaptive interview questions · AI interview feedback · Claude AI interview · interview coaching tool · software engineer interview practice · system design interview prep · job interview simulator · open source interview coach_
+### One-command deploy
+
+```bash
+bash deploy.sh
+```
+
+Handles Docker build + push to Google Artifact Registry, `gcloud run deploy`, and `vercel --prod` in sequence.
+
+### Manual: Backend → GCP Cloud Run
+
+```bash
+gcloud builds submit --tag gcr.io/YOUR_PROJECT/friday-backend ./backend
+
+gcloud run deploy friday-backend \
+  --image gcr.io/YOUR_PROJECT/friday-backend \
+  --platform managed \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --set-env-vars "ANTHROPIC_API_KEY=...,SUPABASE_URL=..."
+```
+
+### Manual: Frontend → Vercel
+
+```bash
+cd frontend && vercel --prod
+```
+
+Set `NEXT_PUBLIC_API_URL` to your Cloud Run service URL in the Vercel project settings.
 
 ---
 
@@ -491,8 +448,6 @@ MIT License — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-Built with Claude · LangGraph · FastAPI · Next.js
-
-If Friday helped you land a job, please ⭐ the repo — it helps others find it too.
+Built by [Variant Labs](https://www.vriantlabs.com) · [hello@vriantlabs.com](mailto:hello@vriantlabs.com)
 
 </div>
