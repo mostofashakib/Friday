@@ -1,7 +1,6 @@
 from __future__ import annotations
 from agents.state import InterviewState
 from llm.manager import get_llm
-from tools.tts import generate_tts
 from tools.agent_tools import INTERVIEWER_TOOLS, make_tool_executor
 
 DIFFICULTY_LABELS = {1: "entry-level", 2: "junior", 3: "mid-level", 4: "senior", 5: "staff/principal"}
@@ -38,7 +37,6 @@ def _build_context(state: InterviewState) -> str:
         f"Interview type: {state['interview_type']}",
     ]
 
-    # ── Coach directives (highest priority — must follow) ─────────────────────
     directives = state.get("coach_directives", [])
     if directives:
         parts.append(
@@ -46,12 +44,10 @@ def _build_context(state: InterviewState) -> str:
             + "\n".join(f"  • {d}" for d in directives)
         )
 
-    # ── Banned competencies (must not ask about) ──────────────────────────────
     banned = state.get("banned_competencies", [])
     if banned:
         parts.append(f"\n🚫 BANNED competencies (do not ask about): {', '.join(banned)}")
 
-    # ── Question budget (remaining questions per competency) ──────────────────
     budget = state.get("question_budget", {})
     available = {c: r for c, r in budget.items() if r > 0 and c not in banned}
     untested = [c for c in available if c not in state.get("competency_scores", {})]
@@ -61,19 +57,16 @@ def _build_context(state: InterviewState) -> str:
     if untested:
         parts.append(f"Untested competencies (prioritise these): {', '.join(untested)}")
 
-    # ── Candidate background ──────────────────────────────────────────────────
     candidate_context = state.get("candidate_context", "")
     if candidate_context:
         parts.append(f"\nCandidate background:\n{candidate_context[:1500]}")
 
-    # ── Weak areas ────────────────────────────────────────────────────────────
     competency_scores = state.get("competency_scores", {})
     if competency_scores:
         weak = [k for k, v in competency_scores.items() if v < 3.0 and k not in banned]
         if weak:
             parts.append(f"Known weak areas to probe: {', '.join(weak)}")
 
-    # ── Prior questions (avoid repetition) ───────────────────────────────────
     history = state.get("messages", [])
     prior = [
         f"- Turn {m['turn_number']}: {m['content'][:120]}{'...' if len(m['content']) > 120 else ''}"
@@ -94,7 +87,6 @@ def _build_context(state: InterviewState) -> str:
 async def interviewer_node(state: InterviewState) -> dict:
     system = SYSTEM_PROMPTS.get(state["interview_type"], SYSTEM_PROMPTS["general"])
 
-    # Follow-up / clarifier: serve pre-computed question directly, skip tools
     if state.get("follow_up_needed") and state.get("follow_up_question"):
         question = state["follow_up_question"]
     else:
@@ -107,13 +99,9 @@ async def interviewer_node(state: InterviewState) -> dict:
             max_tokens=512,
         )
 
-    audio = await generate_tts(question, state["session_id"])
-
     return {
         "current_question": question,
-        "tts_audio": audio,
         "follow_up_needed": False,
         "follow_up_question": "",
-        # Clear directives after reading — they're single-turn instructions
         "coach_directives": [],
     }

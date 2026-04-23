@@ -13,6 +13,7 @@ const ORB_CONFIG: Record<OrbState, {
   bloomColor: string;
   outerBloomColor: string;
   animation: string;
+  outerAnimation: string;
   label: string;
   subLabel: string;
   labelColor: string;
@@ -23,6 +24,7 @@ const ORB_CONFIG: Record<OrbState, {
     bloomColor: "rgba(255,255,255,0.04)",
     outerBloomColor: "transparent",
     animation: "orb-idle-float 4s ease-in-out infinite",
+    outerAnimation: "orb-idle-float 4s ease-in-out 0.1s infinite",
     label: "Waiting…",
     subLabel: "Friday will speak first",
     labelColor: "rgba(255,255,255,0.3)",
@@ -33,6 +35,7 @@ const ORB_CONFIG: Record<OrbState, {
     bloomColor: "rgba(10,132,255,0.15)",
     outerBloomColor: "rgba(10,132,255,0.06)",
     animation: "orb-breathe 2.4s ease-in-out infinite",
+    outerAnimation: "orb-breathe 2.4s ease-in-out 0.1s infinite",
     label: "Friday is speaking",
     subLabel: "Tap to interrupt",
     labelColor: "rgba(10,132,255,0.9)",
@@ -43,6 +46,7 @@ const ORB_CONFIG: Record<OrbState, {
     bloomColor: "rgba(140,100,255,0.15)",
     outerBloomColor: "rgba(140,100,255,0.06)",
     animation: "orb-breathe-fast 0.85s ease-in-out infinite",
+    outerAnimation: "orb-breathe-fast 0.85s ease-in-out 0.1s infinite",
     label: "Listening…",
     subLabel: "Speak your answer",
     labelColor: "rgba(180,140,255,0.9)",
@@ -53,6 +57,7 @@ const ORB_CONFIG: Record<OrbState, {
     bloomColor: "rgba(255,159,10,0.15)",
     outerBloomColor: "rgba(255,159,10,0.06)",
     animation: "orb-breathe 2.4s ease-in-out infinite",
+    outerAnimation: "orb-breathe 2.4s ease-in-out 0.1s infinite",
     label: "Almost done…",
     subLabel: "Keep talking to continue",
     labelColor: "rgba(255,159,10,0.9)",
@@ -71,26 +76,29 @@ export default function VoiceOrb({ state, onInterrupt }: VoiceOrbProps) {
         onClick={isInterruptable ? onInterrupt : undefined}
         disabled={!isInterruptable}
         className="relative flex items-center justify-center focus:outline-none"
-        style={{ width: 120, height: 120, cursor: isInterruptable ? "pointer" : "default" }}
+        style={{
+          width: "clamp(120px, 28vw, 180px)",
+          height: "clamp(120px, 28vw, 180px)",
+          cursor: isInterruptable ? "pointer" : "default",
+        }}
         aria-label={isInterruptable ? "Tap to interrupt Friday" : undefined}
       >
         {/* Outer bloom */}
         <div
           className="absolute rounded-full"
           style={{
-            width: 130,
-            height: 130,
+            width: "clamp(133px, 31vw, 200px)",
+            height: "clamp(133px, 31vw, 200px)",
             background: `radial-gradient(circle, ${cfg.outerBloomColor} 0%, transparent 70%)`,
-            animation: cfg.animation,
-            animationDelay: "0.1s",
+            animation: cfg.outerAnimation,
           }}
         />
         {/* Inner bloom */}
         <div
           className="absolute rounded-full"
           style={{
-            width: 100,
-            height: 100,
+            width: "clamp(107px, 25vw, 160px)",
+            height: "clamp(107px, 25vw, 160px)",
             background: `radial-gradient(circle, ${cfg.bloomColor} 0%, transparent 70%)`,
             animation: cfg.animation,
           }}
@@ -99,8 +107,8 @@ export default function VoiceOrb({ state, onInterrupt }: VoiceOrbProps) {
         <div
           className="relative rounded-full z-10"
           style={{
-            width: 88,
-            height: 88,
+            width: "clamp(93px, 22vw, 140px)",
+            height: "clamp(93px, 22vw, 140px)",
             background: cfg.coreGradient,
             boxShadow: cfg.coreGlow,
             animation: cfg.animation,

@@ -63,10 +63,10 @@ export default function InterviewSetupPage() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen pt-24 pb-16 px-6">
+      <main className="min-h-screen pt-20 sm:pt-24 pb-16 px-4 sm:px-6">
         <div className="relative max-w-xl mx-auto">
           <div className="mb-10">
-            <h1 className="text-3xl font-bold text-white mb-2" style={{ letterSpacing: "-0.035em" }}>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2" style={{ letterSpacing: "-0.035em" }}>
               Set up your interview
             </h1>
             <p className="text-[15px] text-muted">Choose a format and let Friday calibrate to your level.</p>
@@ -135,12 +135,12 @@ export default function InterviewSetupPage() {
                 <p className="text-[12px] font-semibold uppercase tracking-wider mb-3 text-dimmer" style={{ letterSpacing: "0.07em" }}>
                   Starting difficulty
                 </p>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-5 gap-1.5 sm:flex sm:gap-2">
                   {DIFFICULTIES.map(({ v, l }) => (
                     <button
                       key={v}
                       onClick={() => setDifficulty(v)}
-                      className={`flex-1 py-2 text-[13px] font-medium transition-all duration-200 ${difficulty === v ? "btn-primary" : "btn-ghost"}`}
+                      className={`py-2 text-[12px] sm:text-[13px] font-medium transition-all duration-200 ${difficulty === v ? "btn-primary" : "btn-ghost"}`}
                       style={{ borderRadius: "12px" }}
                     >
                       {l}

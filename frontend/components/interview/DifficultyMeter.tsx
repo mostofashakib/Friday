@@ -44,9 +44,6 @@ export default function DifficultyMeter({ difficulty, turn, maxTurns }: Difficul
               />
             ))}
           </div>
-          <span className="text-[11px] font-semibold" style={{ color }}>
-            {DIFFICULTY_LABELS[difficulty] ?? "Mid-Level"}
-          </span>
         </div>
       </div>
     </div>

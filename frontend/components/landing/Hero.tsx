@@ -3,7 +3,7 @@ import { AUTH_ENABLED } from "@/lib/auth-config";
 
 export default function Hero() {
   return (
-    <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 overflow-hidden">
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-4 sm:px-6 pt-24 pb-20 overflow-hidden">
       <div className="relative max-w-4xl mx-auto text-center space-y-8 w-full">
 
         {/* Headline */}
@@ -45,9 +45,8 @@ export default function Hero() {
         {/* Hero centerpiece — Mini Report Dashboard */}
         <div className="animate-fade-up delay-500 flex justify-center">
           <div
-            className="card-gb animate-float"
+            className="card-gb animate-float w-full max-w-85"
             style={{
-              width: "340px",
               filter: "drop-shadow(0 24px 60px rgba(10,132,255,0.2))",
             }}
           >

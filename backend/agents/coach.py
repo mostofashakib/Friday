@@ -1,7 +1,8 @@
 from __future__ import annotations
 from agents.state import InterviewState
 from llm.manager import get_llm
-from tools.agent_tools import COACH_TOOLS, make_tool_executor, decrement_budget, _normalize_competency
+from tools.agent_tools import COACH_TOOLS, make_tool_executor, decrement_budget
+from tools.question_bank import normalize_competency
 
 COACH_SYSTEM = """You are an expert interview coach managing a live interview session.
 
@@ -22,6 +23,18 @@ that is specific and actionable — tell the candidate exactly what to improve.
 Output ONLY the coaching note, no preamble."""
 
 
+def calibrate_difficulty(current: int, scores: dict) -> int:
+    """Adjust difficulty based on rolling average across all competency scores."""
+    if not scores:
+        return current
+    avg = sum(scores.values()) / len(scores)
+    if avg >= 4.0 and current < 5:
+        return min(5, current + 1)
+    if avg <= 2.0 and current > 1:
+        return max(1, current - 1)
+    return current
+
+
 async def coach_node(state: InterviewState) -> dict:
     grading = state.get("grading", {})
     score = grading.get("score", 3)
@@ -31,16 +44,13 @@ async def coach_node(state: InterviewState) -> dict:
 
     coaching_notes = list(state.get("coaching_notes", []))
 
-    # ── Auto-decrement budget and auto-ban exhausted competencies ──────────────
     if competency:
-        decrement_budget(state, competency)  # mutates state["question_budget"] + may auto-ban
+        decrement_budget(state, normalize_competency(competency))
 
-    # ── Build rich prompt for the Coach LLM ───────────────────────────────────
     turns_left = max_turns - turn_count
     banned = state.get("banned_competencies", [])
     budget = state.get("question_budget", {})
 
-    # Summarise coverage so Coach can make informed ban/directive decisions
     coverage_lines = []
     for comp, remaining in sorted(budget.items()):
         score_val = state.get("competency_scores", {}).get(comp)
@@ -49,7 +59,6 @@ async def coach_node(state: InterviewState) -> dict:
         coverage_lines.append(f"  {comp}: {score_str} [{status}]")
     coverage = "\n".join(coverage_lines) if coverage_lines else "  (no questions asked yet)"
 
-    # Last two user answers for inconsistency detection
     msgs = state.get("messages", [])
     user_msgs = [m for m in msgs if m.get("role") == "user"]
     history_snippet = ""
@@ -83,22 +92,13 @@ async def coach_node(state: InterviewState) -> dict:
     )
     coaching_notes.append(note)
 
-    # ── Difficulty calibration ────────────────────────────────────────────────
-    difficulty = state["difficulty"]
-    competency_scores = state.get("competency_scores", {})
-    if competency_scores:
-        avg_score = sum(competency_scores.values()) / len(competency_scores)
-        if avg_score >= 4.0 and difficulty < 5:
-            difficulty = min(5, difficulty + 1)
-        elif avg_score <= 2.0 and difficulty > 1:
-            difficulty = max(1, difficulty - 1)
+    new_difficulty = calibrate_difficulty(state["difficulty"], state.get("competency_scores", {}))
 
     return {
         "coaching_notes": coaching_notes,
-        "difficulty": difficulty,
+        "difficulty": new_difficulty,
         "session_complete": turn_count >= max_turns,
         "turn_count": turn_count,
-        # Propagate Coach's state mutations back through the graph
         "banned_competencies": state.get("banned_competencies", []),
         "question_budget": state.get("question_budget", {}),
         "coach_directives": state.get("coach_directives", []),

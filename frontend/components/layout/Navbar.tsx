@@ -44,7 +44,7 @@ export default function Navbar() {
         boxShadow: scrolled ? "0 1px 0 rgba(94,92,230,0.08)" : "none",
       }}
     >
-      <div className="max-w-6xl mx-auto px-6 flex items-center justify-between" style={{ height: "60px" }}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 flex items-center justify-between" style={{ height: "60px" }}>
         <Link href="/" className="flex items-center group">
           <span
             className="text-white/90 group-hover:text-white transition-colors"

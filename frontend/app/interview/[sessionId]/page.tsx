@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import QuestionCard from "@/components/interview/QuestionCard";
-import TranscriptPanel from "@/components/interview/TranscriptPanel";
 import DifficultyMeter from "@/components/interview/DifficultyMeter";
 import VoiceOrb from "@/components/interview/VoiceOrb";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
@@ -195,47 +194,32 @@ export default function InterviewSessionPage() {
   return (
     <>
       <Navbar />
-      <main className="relative min-h-screen pt-20 pb-12 px-4">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <main className="relative min-h-screen pt-20 pb-12 px-3 sm:px-4">
+        <div className="max-w-3xl mx-auto space-y-4">
 
-          {/* Left column: Transcript */}
-          <div className="lg:col-span-1">
-            <div className="card-gb-subtle h-full">
-              <div className="card-gb-subtle-inner p-4 h-full">
-                <p className="text-[11px] font-semibold uppercase tracking-wider mb-4 text-dimmer" style={{ letterSpacing: "0.07em" }}>
-                  Conversation
-                </p>
-                <TranscriptPanel messages={messages} />
-              </div>
+          {/* Progress bar */}
+          <div className="card-gb-subtle">
+            <div className="card-gb-subtle-inner px-5 py-4">
+              <DifficultyMeter difficulty={difficulty} turn={currentTurn} maxTurns={MAX_TURNS} />
             </div>
           </div>
 
-          {/* Right column: Active interview */}
-          <div className="lg:col-span-2 space-y-4">
-
-            {/* Progress bar */}
-            <div className="card-gb-subtle">
-              <div className="card-gb-subtle-inner px-5 py-4">
-                <DifficultyMeter difficulty={difficulty} turn={currentTurn} maxTurns={MAX_TURNS} />
-              </div>
+          {/* Hero orb */}
+          <div className="card-gb-subtle">
+            <div className="card-gb-subtle-inner px-5 py-8 sm:py-14 md:py-20 flex flex-col items-center">
+              <VoiceOrb state={orbState} onInterrupt={handleOrbInterrupt} />
             </div>
+          </div>
 
-            {/* Hero orb */}
-            <div className="card-gb-subtle">
-              <div className="card-gb-subtle-inner px-5 py-6 flex flex-col items-center">
-                <VoiceOrb state={orbState} onInterrupt={handleOrbInterrupt} />
-              </div>
-            </div>
-
-            {/* Current question */}
-            {currentQuestion && (
-              <QuestionCard
-                question={currentQuestion}
-                turn={currentTurn}
-                difficulty={difficulty}
-                isFollowup={isFollowup}
-              />
-            )}
+          {/* Current question */}
+          {currentQuestion && (
+            <QuestionCard
+              question={currentQuestion}
+              turn={currentTurn}
+              difficulty={difficulty}
+              isFollowup={isFollowup}
+            />
+          )}
 
             {/* Live transcript */}
             {(orbState === "user-speaking" || orbState === "countdown") && recorder.liveTranscript && (
@@ -332,7 +316,6 @@ export default function InterviewSessionPage() {
               </p>
             )}
 
-          </div>
         </div>
       </main>
     </>

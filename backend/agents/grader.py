@@ -1,7 +1,7 @@
 from __future__ import annotations
-import json
 from agents.state import InterviewState
 from llm.manager import get_llm
+from utils.json_utils import parse_llm_json
 
 GRADER_SYSTEM = """You are an expert interview evaluator. Evaluate the candidate's answer and return a JSON object.
 
@@ -24,6 +24,18 @@ Scoring rubric:
 """
 
 
+def _update_competency_scores(
+    current_scores: dict, competency: str, new_score: int
+) -> dict:
+    """Rolling average: blend new score with existing score for the competency."""
+    updated = dict(current_scores)
+    if competency in updated:
+        updated[competency] = (updated[competency] + new_score) / 2
+    else:
+        updated[competency] = float(new_score)
+    return updated
+
+
 async def grader_node(state: InterviewState) -> dict:
     prompt = (
         f"Question: {state['current_question']}\n\n"
@@ -40,20 +52,12 @@ async def grader_node(state: InterviewState) -> dict:
         max_tokens=1024,
     )
 
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    grading = json.loads(raw.strip())
-
+    grading = parse_llm_json(raw)
     competency = grading.get("competency", "general")
     score = grading.get("score", 3)
-    updated_scores = dict(state.get("competency_scores", {}))
-    if competency in updated_scores:
-        prev = updated_scores[competency]
-        updated_scores[competency] = (prev + score) / 2
-    else:
-        updated_scores[competency] = float(score)
+    updated_scores = _update_competency_scores(
+        state.get("competency_scores", {}), competency, score
+    )
 
     return {
         "grading": grading,
