@@ -1,8 +1,8 @@
 <div align="center">
 
-# Friday — AI Mock Interview Coach
+# Friday — AI Interview Coach
 
-**Adaptive AI-powered behavioral interview practice with real-time coaching, voice interaction, and personalized candidate profiling.**
+**Practice behavioral interview with an AI Interview Coach**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
@@ -30,13 +30,13 @@
 
 Friday runs a stateful LangGraph pipeline where five specialized AI agents share session memory and collaborate to run a coherent, calibrated interview:
 
-| Agent | Trigger | Role |
-|-------|---------|------|
+| Agent           | Trigger                        | Role                                                                                                                                          |
+| --------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Interviewer** | Start + after each graded turn | Selects calibrated questions from the curated bank using `search_question_bank` and `get_competency_history` tools. Follows Coach directives. |
-| **Grader** | Every user answer | Scores the answer 1–5, identifies competency, lists strengths and gaps. Feeds into routing. |
-| **Clarifier** | Score ≤ 2 | Generates a probing follow-up that tests foundational understanding of the weak area. |
-| **Followup** | Score 3–4 | Runs RAG similarity search over prior answers. Triggers a targeted follow-up when recurring gaps are found. |
-| **Coach** | After grading (most turns) | Bans saturated competencies, sets directives for the Interviewer, flags anomalies for human review, and produces a concise coaching note. |
+| **Grader**      | Every user answer              | Scores the answer 1–5, identifies competency, lists strengths and gaps. Feeds into routing.                                                   |
+| **Clarifier**   | Score ≤ 2                      | Generates a probing follow-up that tests foundational understanding of the weak area.                                                         |
+| **Followup**    | Score 3–4                      | Runs RAG similarity search over prior answers. Triggers a targeted follow-up when recurring gaps are found.                                   |
+| **Coach**       | After grading (most turns)     | Bans saturated competencies, sets directives for the Interviewer, flags anomalies for human review, and produces a concise coaching note.     |
 
 ### Conditional Agent Routing
 
@@ -58,10 +58,12 @@ Answer submitted
 Agents call structured tools mid-reasoning:
 
 **Interviewer tools:**
+
 - `search_question_bank(competency, difficulty)` — retrieves a curated question from the 135-question bank (9 competencies × 5 levels)
 - `get_competency_history(competency)` — reads rolling score and attempt count before picking a topic
 
 **Coach tools:**
+
 - `ban_competency(competency, reason)` — marks a topic as saturated; Interviewer skips it
 - `set_directive(directive)` — writes a specific instruction the Interviewer must follow next turn
 - `flag_for_human_review(reason, severity)` — escalates the session when anomalies are detected
@@ -80,12 +82,12 @@ coach_directives: list[str]      # explicit instructions consumed by next Interv
 
 Before the first question, Friday builds a candidate profile from up to four sources concurrently:
 
-| Source | Tool | What it does |
-|--------|------|-------------|
-| **GitHub username** | `tools/github.py` | Fetches all repos, LLM-summarizes each, creates a condensed engineering profile |
-| **Google Scholar name** | `tools/scholar.py` | Pulls publications via `scholarly`, summarizes research background |
-| **Resume file** | `tools/resume.py` | Extracts text from PDF (`pypdf`) or plain text, LLM-summarizes |
-| **Job posting URL** | `tools/job_scraper.py` | Fetches page with `httpx`, strips HTML with BeautifulSoup, extracts role requirements |
+| Source                  | Tool                   | What it does                                                                          |
+| ----------------------- | ---------------------- | ------------------------------------------------------------------------------------- |
+| **GitHub username**     | `tools/github.py`      | Fetches all repos, LLM-summarizes each, creates a condensed engineering profile       |
+| **Google Scholar name** | `tools/scholar.py`     | Pulls publications via `scholarly`, summarizes research background                    |
+| **Resume file**         | `tools/resume.py`      | Extracts text from PDF (`pypdf`) or plain text, LLM-summarizes                        |
+| **Job posting URL**     | `tools/job_scraper.py` | Fetches page with `httpx`, strips HTML with BeautifulSoup, extracts role requirements |
 
 All context is injected into the Interviewer's system prompt so questions are anchored to the candidate's actual background.
 
@@ -178,20 +180,20 @@ Every `/turn` response includes a per-turn decision log:
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Next.js 14 App Router, Tailwind CSS v4, TypeScript |
-| **Backend** | FastAPI, Python 3.11+, uvicorn |
-| **Agent Orchestration** | LangGraph (stateful multi-agent with conditional edges) |
-| **LLM** | Anthropic Claude (default) — OpenAI, Google Gemini, Ollama supported |
-| **TTS** | ElevenLabs `eleven_turbo_v2` |
-| **STT** | Web Speech API (browser-native) |
-| **RAG Embeddings** | OpenAI `text-embedding-3-small` |
-| **Vector Store** | Supabase pgvector |
-| **Database** | Supabase (PostgreSQL) |
-| **Auth** | Supabase Auth (bypassable via `AUTH_ENABLED` flag) |
-| **Frontend Hosting** | Vercel |
-| **Backend Hosting** | GCP Cloud Run |
+| Layer                   | Technology                                                           |
+| ----------------------- | -------------------------------------------------------------------- |
+| **Frontend**            | Next.js 14 App Router, Tailwind CSS v4, TypeScript                   |
+| **Backend**             | FastAPI, Python 3.11+, uvicorn                                       |
+| **Agent Orchestration** | LangGraph (stateful multi-agent with conditional edges)              |
+| **LLM**                 | Anthropic Claude (default) — OpenAI, Google Gemini, Ollama supported |
+| **TTS**                 | ElevenLabs `eleven_turbo_v2`                                         |
+| **STT**                 | Web Speech API (browser-native)                                      |
+| **RAG Embeddings**      | OpenAI `text-embedding-3-small`                                      |
+| **Vector Store**        | Supabase pgvector                                                    |
+| **Database**            | Supabase (PostgreSQL)                                                |
+| **Auth**                | Supabase Auth (bypassable via `AUTH_ENABLED` flag)                   |
+| **Frontend Hosting**    | Vercel                                                               |
+| **Backend Hosting**     | GCP Cloud Run                                                        |
 
 ---
 
@@ -272,11 +274,11 @@ Friday/
 
 ### Prerequisites
 
-| Tool | Version |
-|------|---------|
-| Python | 3.11+ |
-| Node.js | 18+ |
-| npm | 9+ |
+| Tool    | Version |
+| ------- | ------- |
+| Python  | 3.11+   |
+| Node.js | 18+     |
+| npm     | 9+      |
 
 ### Quick Setup
 
@@ -312,25 +314,25 @@ Set `AUTH_ENABLED = false` in `frontend/lib/auth-config.ts` to bypass Supabase A
 
 ### Backend (`backend/.env`)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | ✅ | Claude API key |
-| `ELEVENLABS_API_KEY` | ✅ | ElevenLabs TTS key |
-| `OPENAI_API_KEY` | ✅ | For RAG embeddings (`text-embedding-3-small`) |
-| `SUPABASE_URL` | ✅ | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service role key (server-only) |
-| `CORS_ORIGINS` | ✅ | Comma-separated allowed origins |
-| `LLM_PROVIDER` | ❌ | `anthropic` (default) \| `openai` \| `google` \| `ollama` |
-| `MAX_TURNS` | ❌ | Interview length (default: `8`) |
+| Variable                    | Required | Description                                               |
+| --------------------------- | -------- | --------------------------------------------------------- |
+| `ANTHROPIC_API_KEY`         | ✅       | Claude API key                                            |
+| `ELEVENLABS_API_KEY`        | ✅       | ElevenLabs TTS key                                        |
+| `OPENAI_API_KEY`            | ✅       | For RAG embeddings (`text-embedding-3-small`)             |
+| `SUPABASE_URL`              | ✅       | Supabase project URL                                      |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅       | Service role key (server-only)                            |
+| `CORS_ORIGINS`              | ✅       | Comma-separated allowed origins                           |
+| `LLM_PROVIDER`              | ❌       | `anthropic` (default) \| `openai` \| `google` \| `ollama` |
+| `MAX_TURNS`                 | ❌       | Interview length (default: `8`)                           |
 
 ### Frontend (`frontend/.env.local`)
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Same Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon key |
-| `NEXT_PUBLIC_API_URL` | ✅ | Backend URL (`http://localhost:8000` or Cloud Run URL) |
-| `NEXT_PUBLIC_SITE_URL` | ❌ | Canonical site URL for SEO (e.g. `https://interviewwithfriday.com`) |
+| Variable                        | Required | Description                                                         |
+| ------------------------------- | -------- | ------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`      | ✅       | Same Supabase project URL                                           |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅       | Supabase anon key                                                   |
+| `NEXT_PUBLIC_API_URL`           | ✅       | Backend URL (`http://localhost:8000` or Cloud Run URL)              |
+| `NEXT_PUBLIC_SITE_URL`          | ❌       | Canonical site URL for SEO (e.g. `https://interviewwithfriday.com`) |
 
 ---
 
@@ -350,15 +352,15 @@ GET    /sessions/{id}/history       Raw message history
 
 **`POST /sessions`** — multipart form fields:
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `interview_type` | string | `behavioral` |
-| `difficulty` | int | 1–5 |
-| `role` | string | Target job title |
+| Field             | Type   | Description                       |
+| ----------------- | ------ | --------------------------------- |
+| `interview_type`  | string | `behavioral`                      |
+| `difficulty`      | int    | 1–5                               |
+| `role`            | string | Target job title                  |
 | `github_username` | string | Optional — GitHub profile context |
-| `scholar_name` | string | Optional — Google Scholar context |
-| `job_url` | string | Optional — job posting URL |
-| `resume` | file | Optional — PDF or text |
+| `scholar_name`    | string | Optional — Google Scholar context |
+| `job_url`         | string | Optional — job posting URL        |
+| `resume`          | file   | Optional — PDF or text            |
 
 **`POST /sessions/{id}/turn`** response:
 
@@ -381,11 +383,20 @@ GET    /sessions/{id}/history       Raw message history
   "route": "followup",
   "human_review_flag": null,
   "agent_trace": [
-    { "node": "grader",      "decision": "score=3, competency=problem_solving" },
-    { "node": "router",      "decision": "score=3 → routing to followup" },
-    { "node": "followup",    "decision": "no follow-up gaps found, proceeding to coach" },
-    { "node": "coach",       "decision": "rolling avg 3.2, difficulty held at 3, session_complete=False" },
-    { "node": "interviewer", "decision": "selecting next question at difficulty 3" }
+    { "node": "grader", "decision": "score=3, competency=problem_solving" },
+    { "node": "router", "decision": "score=3 → routing to followup" },
+    {
+      "node": "followup",
+      "decision": "no follow-up gaps found, proceeding to coach"
+    },
+    {
+      "node": "coach",
+      "decision": "rolling avg 3.2, difficulty held at 3, session_complete=False"
+    },
+    {
+      "node": "interviewer",
+      "decision": "selecting next question at difficulty 3"
+    }
   ]
 }
 ```

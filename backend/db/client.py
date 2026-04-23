@@ -1,13 +1,15 @@
 import os
-from supabase import create_client, Client
 
-_client: Client | None = None
+SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+USE_LOCAL_DB = not SUPABASE_URL or "your-project" in SUPABASE_URL
+
+_client = None
 
 
-def get_client() -> Client:
+def get_client():
     global _client
     if _client is None:
-        url = os.environ["SUPABASE_URL"]
-        key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-        _client = create_client(url, key)
+        from supabase import create_client
+        key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+        _client = create_client(SUPABASE_URL, key)
     return _client

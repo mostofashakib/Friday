@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # Friday — Local Development Runner
-# Starts backend (FastAPI/uvicorn on :8000) and frontend (Next.js on :3000)
-# together. Ctrl+C gracefully stops both.
+# Clears any existing processes on :8000/:3000, then starts backend + frontend.
+# Ctrl+C gracefully stops both.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -24,7 +24,22 @@ err()  { echo -e "${RED}  ✗${RESET} $*"; }
 backend_log()  { while IFS= read -r line; do echo -e "${CYAN}[backend] ${RESET}$line"; done; }
 frontend_log() { while IFS= read -r line; do echo -e "${GREEN}[frontend]${RESET} $line"; done; }
 
-# ── Cleanup on exit ───────────────────────────────────────────────────────────
+# ── Kill a port (TERM then SIGKILL) ──────────────────────────────────────────
+kill_port() {
+  local port="$1" label="$2"
+  local pids
+  pids=$(lsof -ti:"$port" 2>/dev/null || true)
+  if [[ -n "$pids" ]]; then
+    echo "$pids" | xargs kill -TERM 2>/dev/null || true
+    sleep 0.4
+    local remaining
+    remaining=$(lsof -ti:"$port" 2>/dev/null || true)
+    [[ -n "$remaining" ]] && echo "$remaining" | xargs kill -9 2>/dev/null || true
+    ok "Cleared $label (port $port)"
+  fi
+}
+
+# ── Cleanup on Ctrl+C / TERM ─────────────────────────────────────────────────
 BACKEND_PID=""
 FRONTEND_PID=""
 
@@ -33,11 +48,20 @@ cleanup() {
   log "Shutting down..."
   [[ -n "$BACKEND_PID" ]]  && kill "$BACKEND_PID"  2>/dev/null && ok "Backend stopped"
   [[ -n "$FRONTEND_PID" ]] && kill "$FRONTEND_PID" 2>/dev/null && ok "Frontend stopped"
-  lsof -ti:8000 2>/dev/null | xargs kill -9 2>/dev/null || true
-  lsof -ti:3000 2>/dev/null | xargs kill -9 2>/dev/null || true
+  kill_port 8000 "backend"
+  kill_port 3000 "frontend"
   exit 0
 }
 trap cleanup INT TERM
+
+# ── Clear any already-running instances ──────────────────────────────────────
+log "Clearing any running processes..."
+kill_port 8000 "backend"
+kill_port 3000 "frontend"
+# Belt-and-suspenders: kill stray process names too
+pgrep -f "uvicorn main:app" 2>/dev/null | xargs kill -9 2>/dev/null || true
+pgrep -f "next-server"      2>/dev/null | xargs kill -9 2>/dev/null || true
+pgrep -f "next dev"         2>/dev/null | xargs kill -9 2>/dev/null || true
 
 # ── Preflight checks ─────────────────────────────────────────────────────────
 log "Running preflight checks..."
@@ -71,7 +95,6 @@ if [[ ! -d "$VENV_DIR" ]]; then
   ok "Virtual environment ready"
 fi
 
-# Activate for the rest of this script (and all subprocesses)
 # shellcheck source=/dev/null
 source "$VENV_DIR/bin/activate"
 ok "Virtual environment activated ($(python --version))"
@@ -79,14 +102,6 @@ ok "Virtual environment activated ($(python --version))"
 if [[ ! -d "$FRONTEND_DIR/node_modules" ]]; then
   warn "node_modules missing — running npm install..."
   npm --prefix "$FRONTEND_DIR" install --silent
-fi
-
-# ── Check ports are free ─────────────────────────────────────────────────────
-if lsof -ti:8000 &>/dev/null; then
-  warn "Port 8000 is in use. Run 'bash kill.sh' first, or it may conflict."
-fi
-if lsof -ti:3000 &>/dev/null; then
-  warn "Port 3000 is in use. Run 'bash kill.sh' first, or it may conflict."
 fi
 
 # ── Start backend ─────────────────────────────────────────────────────────────
@@ -97,7 +112,6 @@ log "Starting backend on ${CYAN}http://localhost:8000${RESET}"
 ) | backend_log &
 BACKEND_PID=$!
 
-# Give uvicorn a moment to start
 sleep 2
 
 # ── Start frontend ────────────────────────────────────────────────────────────

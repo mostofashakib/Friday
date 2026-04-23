@@ -17,10 +17,10 @@ from db.queries import (
     get_session,
     complete_session,
     save_message,
+    update_message_score,
     get_messages,
     get_competency_scores,
 )
-from db.client import get_client
 from rag.retriever import index_answer
 from tools.agent_tools import ALL_COMPETENCIES, DEFAULT_QUESTION_BUDGET
 from tools.github import build_candidate_context
@@ -207,10 +207,7 @@ async def submit_turn(
     trace.append({"node": "grader", "decision": f"score={score}, competency={competency}"})
 
     # Back-fill score onto the user message
-    get_client().table("messages").update({
-        "competency": competency,
-        "score": score,
-    }).eq("id", user_msg["id"]).execute()
+    update_message_score(user_msg["id"], competency, score)
 
     # Index for RAG (non-critical)
     try:

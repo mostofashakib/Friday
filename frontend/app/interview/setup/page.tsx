@@ -31,6 +31,7 @@ export default function InterviewSetupPage() {
   const [scholarName, setScholarName] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jobUrl, setJobUrl] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -229,17 +230,35 @@ export default function InterviewSetupPage() {
                     className="hidden"
                     onChange={(e) => setResumeFile(e.target.files?.[0] ?? null)}
                   />
-                  <button
-                    type="button"
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full rounded-xl px-4 py-3 text-left flex items-center gap-3 transition-all duration-200"
+                    onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragOver(false);
+                      const file = e.dataTransfer.files[0];
+                      if (file) setResumeFile(file);
+                    }}
+                    className="w-full rounded-xl px-4 py-3 text-left flex items-center gap-3 transition-all duration-200 cursor-pointer select-none"
                     style={{
-                      background: resumeFile ? "rgba(10,132,255,0.07)" : "rgba(255,255,255,0.02)",
-                      border: resumeFile ? "1px solid rgba(10,132,255,0.25)" : "1px dashed rgba(255,255,255,0.1)",
+                      background: isDragOver
+                        ? "rgba(10,132,255,0.12)"
+                        : resumeFile
+                        ? "rgba(10,132,255,0.07)"
+                        : "rgba(255,255,255,0.02)",
+                      border: isDragOver
+                        ? "1px dashed rgba(10,132,255,0.6)"
+                        : resumeFile
+                        ? "1px solid rgba(10,132,255,0.25)"
+                        : "1px dashed rgba(255,255,255,0.1)",
                     }}
                   >
                     <span className="text-base">{resumeFile ? "📄" : "⬆️"}</span>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       {resumeFile ? (
                         <>
                           <p className="text-[13px] font-medium truncate" style={{ color: "rgba(255,255,255,0.8)" }}>
@@ -248,20 +267,25 @@ export default function InterviewSetupPage() {
                           <p className="text-[11px] text-dimmer">{(resumeFile.size / 1024).toFixed(0)} KB</p>
                         </>
                       ) : (
-                        <p className="text-[13px] text-dimmer">Upload PDF or text file</p>
+                        <>
+                          <p className="text-[13px] text-dimmer">
+                            {isDragOver ? "Drop to upload" : "Click or drag to upload"}
+                          </p>
+                          <p className="text-[11px] text-dimmer opacity-60">PDF or text file</p>
+                        </>
                       )}
                     </div>
                     {resumeFile && (
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setResumeFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                        className="ml-auto text-[11px] px-2 py-0.5 rounded-md transition-colors"
+                        className="ml-auto text-[11px] px-2 py-0.5 rounded-md transition-colors shrink-0"
                         style={{ color: "rgba(255,255,255,0.3)", background: "rgba(255,255,255,0.05)" }}
                       >
                         Remove
                       </button>
                     )}
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
