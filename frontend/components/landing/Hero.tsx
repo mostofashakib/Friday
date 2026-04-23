@@ -1,156 +1,125 @@
 import Link from "next/link";
+import { AUTH_ENABLED } from "@/lib/auth-config";
 
 export default function Hero() {
   return (
-    <section className="relative min-h-screen flex items-center justify-center px-6 pt-20 pb-16 overflow-hidden">
-      {/* Background glow orbs */}
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          top: "15%", left: "50%", transform: "translateX(-50%)",
-          width: "600px", height: "600px",
-          background: "radial-gradient(circle, rgba(10,132,255,0.12) 0%, transparent 65%)",
-          filter: "blur(40px)",
-          animation: "glow-pulse 4s ease-in-out infinite",
-        }}
-      />
-      <div
-        className="absolute pointer-events-none"
-        style={{
-          top: "30%", left: "30%",
-          width: "400px", height: "400px",
-          background: "radial-gradient(circle, rgba(94,92,230,0.08) 0%, transparent 70%)",
-          filter: "blur(60px)",
-          animation: "glow-pulse 5s ease-in-out infinite 1s",
-        }}
-      />
-
-      <div className="relative max-w-4xl mx-auto text-center space-y-8">
-        {/* Badge */}
-        <div className="animate-fade-in inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[12px] font-medium tracking-wide"
-          style={{
-            background: "rgba(10,132,255,0.08)",
-            border: "1px solid rgba(10,132,255,0.2)",
-            color: "rgba(10,132,255,0.9)",
-          }}>
-          <span
-            className="w-1.5 h-1.5 rounded-full"
-            style={{
-              background: "#0A84FF",
-              boxShadow: "0 0 6px #0A84FF",
-              animation: "glow-pulse 2s ease-in-out infinite",
-            }}
-          />
-          AI-Powered · Voice-First · Adaptive
-        </div>
+    <section className="relative min-h-screen flex flex-col items-center justify-center px-6 pt-24 pb-20 overflow-hidden">
+      <div className="relative max-w-4xl mx-auto text-center space-y-8 w-full">
 
         {/* Headline */}
-        <div className="animate-fade-up delay-75 space-y-3">
+        <div className="animate-fade-in space-y-3">
           <h1
-            className="text-[clamp(2.8rem,7vw,5.5rem)] font-bold leading-[1.04] tracking-[-0.03em]"
+            className="heading-xl animate-fade-up"
             style={{
-              background: "linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.72) 100%)",
+              background: "linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.65) 100%)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
             }}
           >
             Ace your next interview
-            <br />
-            <span
-              style={{
-                background: "linear-gradient(135deg, #0A84FF 0%, #5E5CE6 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }}
-            >
-              with your AI coach
-            </span>
           </h1>
         </div>
 
         {/* Subtext */}
-        <p
-          className="animate-fade-up delay-150 text-[clamp(1rem,2vw,1.2rem)] leading-relaxed max-w-2xl mx-auto"
-          style={{ color: "rgba(245,245,247,0.52)" }}
-        >
+        <p className="animate-fade-up delay-150 text-[clamp(1rem,2vw,1.2rem)] leading-relaxed max-w-2xl mx-auto text-muted">
           Friday listens to your answers, detects knowledge gaps in real time, and adapts
           the difficulty like having a senior engineer run your interview loop.
         </p>
 
         {/* CTAs */}
         <div className="animate-fade-up delay-300 flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link
-            href="/signup"
-            className="w-full sm:w-auto text-[15px] font-semibold px-8 py-3 rounded-full text-white transition-all duration-200 active:scale-95"
-            style={{
-              background: "#0A84FF",
-              boxShadow: "0 0 0 1px rgba(10,132,255,0.3), 0 4px 24px rgba(10,132,255,0.35)",
-            }}
-          >
+          <Link href={AUTH_ENABLED ? "/signup" : "/interview/setup"} className="btn-primary w-full sm:w-auto text-[15px] px-8 py-3">
             Start practicing free
           </Link>
-          <Link
-            href="#how-it-works"
-            className="w-full sm:w-auto text-[15px] font-medium px-8 py-3 rounded-full transition-all duration-200"
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              color: "rgba(245,245,247,0.75)",
-            }}
-          >
+          <Link href="#how-it-works" className="btn-ghost w-full sm:w-auto text-[15px] px-8 py-3">
             See how it works
           </Link>
         </div>
 
-        {/* Social proof nudge */}
-        <p className="animate-fade-up delay-500 text-[13px]" style={{ color: "rgba(255,255,255,0.22)" }}>
+        {/* Social proof */}
+        <p className="animate-fade-up delay-500 text-[13px] text-dimmer">
           No credit card required &nbsp;·&nbsp; Behavioral, technical &amp; role-based
         </p>
 
-        {/* Floating preview card */}
-        <div
-          className="animate-fade-up delay-500 mx-auto mt-4 max-w-sm rounded-2xl p-px"
-          style={{
-            background: "linear-gradient(135deg, rgba(10,132,255,0.3), rgba(94,92,230,0.3), rgba(10,132,255,0.1))",
-          }}
-        >
+        {/* Hero centerpiece — Mini Report Dashboard */}
+        <div className="animate-fade-up delay-500 flex justify-center">
           <div
-            className="rounded-2xl px-6 py-4 text-left space-y-3"
-            style={{ background: "#0d0d0d" }}
+            className="card-gb animate-float"
+            style={{
+              width: "340px",
+              filter: "drop-shadow(0 24px 60px rgba(10,132,255,0.2))",
+            }}
           >
-            <div className="flex items-center gap-2">
+            <div className="card-gb-inner" style={{ padding: "20px" }}>
+              {/* Header row */}
               <div
-                className="w-6 h-6 rounded-full flex items-center justify-center text-[10px]"
-                style={{ background: "rgba(10,132,255,0.15)", color: "#0A84FF" }}
+                className="flex items-center gap-2 mb-4 pb-3"
+                style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}
               >
-                F
+                <span className="text-[13px] font-bold" style={{ color: "rgba(255,255,255,0.8)", letterSpacing: "-0.02em" }}>
+                  Friday
+                </span>
+                <span
+                  className="ml-auto text-[10px] font-semibold px-2.5 py-0.5 rounded-full"
+                  style={{ background: "rgba(48,209,88,0.12)", color: "#30D158", border: "1px solid rgba(48,209,88,0.2)" }}
+                >
+                  Interview complete
+                </span>
               </div>
-              <span className="text-[12px] font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Friday</span>
-              <span
-                className="ml-auto text-[11px] px-2 py-0.5 rounded-full"
-                style={{ background: "rgba(10,132,255,0.1)", color: "#0A84FF" }}
+
+              {/* Overall score */}
+              <div className="flex items-baseline gap-2 mb-4">
+                <span
+                  className="font-bold leading-none"
+                  style={{ fontSize: "52px", color: "#30D158", letterSpacing: "-0.04em", textShadow: "0 0 40px rgba(48,209,88,0.3)" }}
+                >
+                  4.2
+                </span>
+                <span className="text-[18px]" style={{ color: "rgba(255,255,255,0.22)" }}>/5</span>
+                <span
+                  className="ml-auto text-[11px] font-semibold px-2.5 py-1 rounded-full"
+                  style={{ background: "rgba(48,209,88,0.1)", color: "#30D158", border: "1px solid rgba(48,209,88,0.18)" }}
+                >
+                  Strong
+                </span>
+              </div>
+
+              {/* Competency bars */}
+              <div className="space-y-2.5 mb-4">
+                {[
+                  { label: "Communication", pct: 88, color: "#30D158" },
+                  { label: "Problem-solving", pct: 72, color: "#0A84FF" },
+                  { label: "Technical depth", pct: 58, color: "#5E5CE6" },
+                ].map((bar) => (
+                  <div key={bar.label}>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>{bar.label}</span>
+                      <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.28)" }}>{bar.pct}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.07)" }}>
+                      <div className="h-full rounded-full" style={{ width: `${bar.pct}%`, background: bar.color }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Coaching note */}
+              <div
+                className="rounded-xl px-3 py-2.5 text-[11px] leading-relaxed"
+                style={{
+                  background: "rgba(94,92,230,0.08)",
+                  border: "1px solid rgba(94,92,230,0.15)",
+                  color: "rgba(94,92,230,0.85)",
+                  fontStyle: "italic",
+                }}
               >
-                Senior · 4/5
-              </span>
-            </div>
-            <p className="text-[13px] leading-relaxed" style={{ color: "rgba(255,255,255,0.75)" }}>
-              Tell me about a time you had to make a critical architectural decision with incomplete information. How did you approach it?
-            </p>
-            <div
-              className="flex items-center gap-2 text-[12px] rounded-xl px-4 py-2.5"
-              style={{
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.07)",
-                color: "rgba(255,255,255,0.35)",
-              }}
-            >
-              <span className="w-2 h-2 rounded-full bg-[#0A84FF] animate-pulse" />
-              Listening...
+                Strong framing throughout. Push for more specificity when pressed on technical decisions.
+              </div>
             </div>
           </div>
         </div>
+
       </div>
     </section>
   );

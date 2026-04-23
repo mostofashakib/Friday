@@ -1,7 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { AUTH_ENABLED } from "@/lib/auth-config";
 
 export async function proxy(request: NextRequest) {
+  // Auth gate — set AUTH_ENABLED = false to bypass auth completely
+  if (!AUTH_ENABLED) return NextResponse.next({ request });
+
   // If Supabase is not configured, allow all traffic through
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||

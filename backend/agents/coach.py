@@ -1,12 +1,24 @@
 from __future__ import annotations
-import os
-import anthropic
 from agents.state import InterviewState
+from llm.manager import get_llm
+from tools.agent_tools import COACH_TOOLS, make_tool_executor, decrement_budget, _normalize_competency
 
-_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+COACH_SYSTEM = """You are an expert interview coach managing a live interview session.
 
-COACH_SYSTEM = """You are an expert interview coach. After each answer, provide ONE concise coaching insight (1-2 sentences).
-Focus on what the candidate can do better. Be specific and actionable.
+After reviewing this answer you have three tools to shape future questions:
+
+  • ban_competency(competency, reason) — mark a topic as saturated when you have enough
+    signal (2+ questions, stable score). The Interviewer will skip it entirely.
+
+  • set_directive(directive) — write a specific instruction the Interviewer MUST follow
+    next turn: change topic, demand concrete metrics, increase pressure, etc.
+    One directive per turn is enough; make it actionable.
+
+  • flag_for_human_review(reason, severity) — escalate if you detect wildly inconsistent
+    answers, confusion, distress, or potential cheating.
+
+Use tools proactively to steer coverage. Then output ONE concise coaching note (1-2 sentences)
+that is specific and actionable — tell the candidate exactly what to improve.
 Output ONLY the coaching note, no preamble."""
 
 
@@ -15,26 +27,63 @@ async def coach_node(state: InterviewState) -> dict:
     score = grading.get("score", 3)
     turn_count = state["turn_count"]
     max_turns = state.get("max_turns", 8)
+    competency = grading.get("competency", "")
 
     coaching_notes = list(state.get("coaching_notes", []))
 
-    # Generate coaching note for this turn
+    # ── Auto-decrement budget and auto-ban exhausted competencies ──────────────
+    if competency:
+        decrement_budget(state, competency)  # mutates state["question_budget"] + may auto-ban
+
+    # ── Build rich prompt for the Coach LLM ───────────────────────────────────
+    turns_left = max_turns - turn_count
+    banned = state.get("banned_competencies", [])
+    budget = state.get("question_budget", {})
+
+    # Summarise coverage so Coach can make informed ban/directive decisions
+    coverage_lines = []
+    for comp, remaining in sorted(budget.items()):
+        score_val = state.get("competency_scores", {}).get(comp)
+        score_str = f"{score_val:.1f}/5" if score_val is not None else "untested"
+        status = "BANNED" if comp in banned else f"{remaining}Q left"
+        coverage_lines.append(f"  {comp}: {score_str} [{status}]")
+    coverage = "\n".join(coverage_lines) if coverage_lines else "  (no questions asked yet)"
+
+    # Last two user answers for inconsistency detection
+    msgs = state.get("messages", [])
+    user_msgs = [m for m in msgs if m.get("role") == "user"]
+    history_snippet = ""
+    if len(user_msgs) >= 2:
+        prev = user_msgs[-2]
+        history_snippet = (
+            f"\nPrevious answer (turn {prev.get('turn_number', '?')}): "
+            f"{str(prev.get('content', ''))[:200]}"
+        )
+
     prompt = (
-        f"Question: {state['current_question']}\n"
-        f"Answer: {state['current_answer']}\n"
-        f"Score: {score}/5\n"
+        f"Question asked: {state['current_question']}\n"
+        f"Candidate's answer: {state['current_answer']}\n"
+        f"Score: {score}/5  |  Competency: {competency or 'unclassified'}\n"
         f"Feedback: {grading.get('feedback', '')}\n"
-        f"Gaps: {', '.join(grading.get('gaps', []))}"
+        f"Gaps: {', '.join(grading.get('gaps', []) or ['none'])}\n"
+        f"Turn {turn_count} of {max_turns} ({turns_left} turns remaining)"
+        f"{history_snippet}\n\n"
+        f"Session coverage so far:\n{coverage}\n\n"
+        "Decide now: should any competency be banned? Does the Interviewer need a directive? "
+        "Then write the coaching note."
     )
-    response = _client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=256,
+
+    llm = get_llm()
+    note = await llm.complete_with_tools(
         system=COACH_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
+        tools=COACH_TOOLS,
+        tool_executor=make_tool_executor(state),
+        max_tokens=400,
     )
-    coaching_notes.append(response.content[0].text.strip())
+    coaching_notes.append(note)
 
-    # Calibrate difficulty: adjust based on rolling score
+    # ── Difficulty calibration ────────────────────────────────────────────────
     difficulty = state["difficulty"]
     competency_scores = state.get("competency_scores", {})
     if competency_scores:
@@ -44,11 +93,13 @@ async def coach_node(state: InterviewState) -> dict:
         elif avg_score <= 2.0 and difficulty > 1:
             difficulty = max(1, difficulty - 1)
 
-    session_complete = turn_count >= max_turns
-
     return {
         "coaching_notes": coaching_notes,
         "difficulty": difficulty,
-        "session_complete": session_complete,
+        "session_complete": turn_count >= max_turns,
         "turn_count": turn_count,
+        # Propagate Coach's state mutations back through the graph
+        "banned_competencies": state.get("banned_competencies", []),
+        "question_budget": state.get("question_budget", {}),
+        "coach_directives": state.get("coach_directives", []),
     }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase";
+import { AUTH_ENABLED } from "@/lib/auth-config";
 
 function LoginForm() {
   const router = useRouter();
@@ -13,6 +14,10 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!AUTH_ENABLED) router.replace("/interview/setup");
+  }, [router]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -26,40 +31,62 @@ function LoginForm() {
   }
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-6 cursor-pointer" onClick={() => router.back()}>
-      <div className="fixed inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 0%, rgba(10,132,255,0.07) 0%, transparent 60%)" }} />
-      <div className="relative w-full max-w-sm animate-scale-in cursor-default" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="min-h-screen flex items-center justify-center px-6 cursor-pointer"
+      onClick={() => router.back()}
+    >
+      <div
+        className="relative w-full max-w-sm animate-scale-in cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center gap-2.5 mb-6">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0A84FF, #5E5CE6)", boxShadow: "0 4px 16px rgba(10,132,255,0.3)" }}>
-              <span className="text-white text-sm font-bold">F</span>
-            </div>
-            <span className="text-white font-semibold text-lg">Friday</span>
+          <Link href="/" className="inline-flex items-center mb-6">
+            <span className="text-white font-bold text-xl" style={{ letterSpacing: "-0.03em" }}>Friday</span>
           </Link>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Welcome back</h1>
-          <p className="text-[14px] mt-1.5" style={{ color: "rgba(245,245,247,0.45)" }}>Sign in to continue your practice</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight" style={{ letterSpacing: "-0.03em" }}>Welcome back</h1>
+          <p className="text-[14px] mt-1.5 text-muted">Sign in to continue your practice</p>
         </div>
 
-        <div className="rounded-2xl px-7 py-8 space-y-5" style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[13px] font-medium block" style={{ color: "rgba(255,255,255,0.55)" }} htmlFor="email">Email</label>
-              <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="you@example.com" className="input-apple w-full rounded-xl px-4 py-2.5 text-[14px]" />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[13px] font-medium block" style={{ color: "rgba(255,255,255,0.55)" }} htmlFor="password">Password</label>
-              <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" className="input-apple w-full rounded-xl px-4 py-2.5 text-[14px]" />
-            </div>
-            {error && <p className="text-[13px] rounded-xl px-3 py-2.5" style={{ color: "#FF6B6B", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.15)" }}>{error}</p>}
-            <button type="submit" disabled={loading} className="w-full py-2.5 rounded-xl text-[14px] font-semibold text-white transition-all duration-200 disabled:opacity-50 active:scale-[0.98] mt-1" style={{ background: "#0A84FF", boxShadow: "0 0 0 1px rgba(10,132,255,0.3), 0 4px 16px rgba(10,132,255,0.25)" }}>
-              {loading ? "Signing in…" : "Sign in"}
-            </button>
-          </form>
+        <div className="card-gb">
+          <div className="card-gb-inner px-7 py-8">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-medium block" style={{ color: "rgba(255,255,255,0.55)" }} htmlFor="email">Email</label>
+                <input
+                  id="email" type="email" value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required placeholder="you@example.com"
+                  className="input-glass px-4 py-2.5 text-[14px]"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-medium block" style={{ color: "rgba(255,255,255,0.55)" }} htmlFor="password">Password</label>
+                <input
+                  id="password" type="password" value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required placeholder="••••••••"
+                  className="input-glass px-4 py-2.5 text-[14px]"
+                />
+              </div>
+              {error && (
+                <p className="text-[13px] rounded-xl px-3 py-2.5" style={{ color: "#FF6B6B", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.15)" }}>
+                  {error}
+                </p>
+              )}
+              <button
+                type="submit" disabled={loading}
+                className="btn-primary w-full py-2.5 text-[14px] mt-1"
+                style={{ borderRadius: "12px" }}
+              >
+                {loading ? "Signing in…" : "Sign in"}
+              </button>
+            </form>
+          </div>
         </div>
 
-        <p className="text-center text-[13px] mt-6" style={{ color: "rgba(255,255,255,0.3)" }}>
+        <p className="text-center text-[13px] mt-6 text-dimmer">
           No account?{" "}
-          <Link href="/signup" className="font-medium" style={{ color: "#0A84FF" }}>Sign up free</Link>
+          <Link href="/signup" className="font-medium text-accent">Sign up free</Link>
         </p>
       </div>
     </div>

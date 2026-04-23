@@ -47,22 +47,13 @@ export default function Features() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-16 max-w-2xl mx-auto">
-          <p className="text-[13px] font-medium mb-4 tracking-wide uppercase"
-            style={{ color: "#0A84FF", letterSpacing: "0.08em" }}>
+          <p className="text-[13px] font-semibold mb-4 tracking-widest uppercase text-accent" style={{ letterSpacing: "0.08em" }}>
             Why Friday
           </p>
-          <h2
-            className="text-[clamp(1.8rem,4vw,2.8rem)] font-bold leading-tight tracking-tight mb-4"
-            style={{
-              background: "linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.7) 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}
-          >
+          <h2 className="heading-lg text-gradient-white mb-4">
             Everything you need to ace your interview with confidence
           </h2>
-          <p className="text-base leading-relaxed" style={{ color: "rgba(245,245,247,0.45)" }}>
+          <p className="text-base leading-relaxed text-muted">
             Friday isn&apos;t a question bank. It&apos;s a simulation built on state-of-the-art multi-agent AI.
           </p>
         </div>
@@ -72,39 +63,26 @@ export default function Features() {
           {features.map((f, i) => (
             <div
               key={f.title}
-              className="group rounded-2xl p-6 transition-all duration-300 cursor-default"
-              style={{
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.06)",
-                animationDelay: `${i * 75}ms`,
-              }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.05)";
-                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.1)";
-                (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.03)";
-                (e.currentTarget as HTMLDivElement).style.borderColor = "rgba(255,255,255,0.06)";
-                (e.currentTarget as HTMLDivElement).style.transform = "translateY(0)";
-              }}
+              className="card-gb-subtle card-gb-subtle-lift"
+              style={{ animationDelay: `${i * 75}ms` }}
             >
-              {/* Icon */}
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center mb-5"
-                style={{
-                  background: `${f.color}14`,
-                  border: `1px solid ${f.color}22`,
-                }}
-              >
-                <f.icon size={18} style={{ color: f.color }} />
+              <div className="card-gb-subtle-inner p-6">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-5"
+                  style={{
+                    background: `linear-gradient(135deg, ${f.color}22, ${f.color}10)`,
+                    border: `1px solid ${f.color}28`,
+                  }}
+                >
+                  <f.icon size={18} style={{ color: f.color }} />
+                </div>
+                <h3 className="text-[15px] font-semibold mb-2" style={{ color: "rgba(255,255,255,0.92)" }}>
+                  {f.title}
+                </h3>
+                <p className="text-[13.5px] leading-relaxed text-muted">
+                  {f.description}
+                </p>
               </div>
-              <h3 className="text-[15px] font-semibold mb-2" style={{ color: "rgba(255,255,255,0.9)" }}>
-                {f.title}
-              </h3>
-              <p className="text-[13.5px] leading-relaxed" style={{ color: "rgba(245,245,247,0.45)" }}>
-                {f.description}
-              </p>
             </div>
           ))}
         </div>

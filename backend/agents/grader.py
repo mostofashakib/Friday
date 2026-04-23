@@ -1,10 +1,7 @@
 from __future__ import annotations
 import json
-import os
-import anthropic
 from agents.state import InterviewState
-
-_client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
+from llm.manager import get_llm
 
 GRADER_SYSTEM = """You are an expert interview evaluator. Evaluate the candidate's answer and return a JSON object.
 
@@ -36,22 +33,19 @@ async def grader_node(state: InterviewState) -> dict:
         f"Difficulty level: {state['difficulty']}/5"
     )
 
-    response = _client.messages.create(
-        model="claude-haiku-4-5-20251001",
-        max_tokens=1024,
+    llm = get_llm()
+    raw = await llm.complete(
         system=GRADER_SYSTEM,
         messages=[{"role": "user", "content": prompt}],
+        max_tokens=1024,
     )
 
-    raw = response.content[0].text.strip()
-    # Strip markdown code fences if present
     if raw.startswith("```"):
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
     grading = json.loads(raw.strip())
 
-    # Update competency scores in state
     competency = grading.get("competency", "general")
     score = grading.get("score", 3)
     updated_scores = dict(state.get("competency_scores", {}))

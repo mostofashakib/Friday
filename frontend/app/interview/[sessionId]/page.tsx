@@ -107,7 +107,7 @@ export default function InterviewSessionPage() {
     return (
       <>
         <Navbar />
-        <main className="min-h-screen bg-black pt-24 flex items-center justify-center">
+        <main className="min-h-screen pt-24 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
             <div
               className="w-10 h-10 rounded-2xl flex items-center justify-center"
@@ -115,7 +115,7 @@ export default function InterviewSessionPage() {
             >
               <span className="text-lg">🎙</span>
             </div>
-            <p className="text-[14px]" style={{ color: "rgba(255,255,255,0.35)" }}>Loading your interview…</p>
+            <p className="text-[14px] text-muted">Loading your interview…</p>
           </div>
         </main>
       </>
@@ -125,37 +125,29 @@ export default function InterviewSessionPage() {
   return (
     <>
       <Navbar />
-      {/* Ambient glow */}
-      <div className="fixed inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 60% 40% at 50% 0%, rgba(10,132,255,0.04) 0%, transparent 55%)" }} />
-
-      <main className="relative min-h-screen bg-black pt-20 pb-12 px-4">
+      <main className="relative min-h-screen pt-20 pb-12 px-4">
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-          {/* ── Left column: Transcript ── */}
+          {/* Left column: Transcript */}
           <div className="lg:col-span-1">
-            <div
-              className="rounded-2xl p-4 h-full"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              <p
-                className="text-[11px] font-semibold uppercase tracking-wider mb-4"
-                style={{ color: "rgba(255,255,255,0.25)", letterSpacing: "0.07em" }}
-              >
-                Conversation
-              </p>
-              <TranscriptPanel messages={messages} />
+            <div className="card-gb-subtle h-full">
+              <div className="card-gb-subtle-inner p-4 h-full">
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-4 text-dimmer" style={{ letterSpacing: "0.07em" }}>
+                  Conversation
+                </p>
+                <TranscriptPanel messages={messages} />
+              </div>
             </div>
           </div>
 
-          {/* ── Right column: Active interview ── */}
+          {/* Right column: Active interview */}
           <div className="lg:col-span-2 space-y-4">
 
             {/* Progress bar */}
-            <div
-              className="rounded-2xl px-5 py-4"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              <DifficultyMeter difficulty={difficulty} turn={currentTurn} maxTurns={MAX_TURNS} />
+            <div className="card-gb-subtle">
+              <div className="card-gb-subtle-inner px-5 py-4">
+                <DifficultyMeter difficulty={difficulty} turn={currentTurn} maxTurns={MAX_TURNS} />
+              </div>
             </div>
 
             {/* Current question */}
@@ -180,68 +172,61 @@ export default function InterviewSessionPage() {
 
             {/* Last grading feedback */}
             {lastGrading && (
-              <div
-                className="rounded-2xl px-5 py-4 space-y-2.5"
-                style={{ background: "rgba(94,92,230,0.05)", border: "1px solid rgba(94,92,230,0.12)" }}
-              >
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[12px] font-semibold" style={{ color: "rgba(94,92,230,0.9)" }}>
-                    Coach feedback
-                  </span>
-                  <span
-                    className="text-[11px] font-medium px-1.5 py-0.5 rounded-md"
-                    style={{
-                      background: lastGrading.score >= 4 ? "rgba(48,209,88,0.12)" : lastGrading.score >= 3 ? "rgba(255,159,10,0.12)" : "rgba(255,69,58,0.12)",
-                      color: lastGrading.score >= 4 ? "#30D158" : lastGrading.score >= 3 ? "#FF9F0A" : "#FF453A",
-                    }}
-                  >
-                    {lastGrading.score}/5
-                  </span>
-                  {lastGrading.competency && (
-                    <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.25)" }}>{lastGrading.competency}</span>
+              <div className="card-gb-purple">
+                <div className="card-gb-purple-inner px-5 py-4 space-y-2.5">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-[12px] font-semibold" style={{ color: "rgba(94,92,230,0.9)" }}>
+                      Coach feedback
+                    </span>
+                    <span
+                      className="text-[11px] font-medium px-1.5 py-0.5 rounded-md"
+                      style={{
+                        background: lastGrading.score >= 4 ? "rgba(48,209,88,0.12)" : lastGrading.score >= 3 ? "rgba(255,159,10,0.12)" : "rgba(255,69,58,0.12)",
+                        color: lastGrading.score >= 4 ? "#30D158" : lastGrading.score >= 3 ? "#FF9F0A" : "#FF453A",
+                        boxShadow: lastGrading.score >= 4 ? "0 0 8px rgba(48,209,88,0.2)" : lastGrading.score >= 3 ? "0 0 8px rgba(255,159,10,0.2)" : "0 0 8px rgba(255,69,58,0.2)",
+                      }}
+                    >
+                      {lastGrading.score}/5
+                    </span>
+                    {lastGrading.competency && (
+                      <span className="text-[11px] text-dimmer">{lastGrading.competency}</span>
+                    )}
+                  </div>
+                  <p className="text-[13px] leading-relaxed" style={{ color: "rgba(245,245,247,0.6)" }}>{lastGrading.feedback}</p>
+                  {lastCoachNote && (
+                    <p
+                      className="text-[13px] leading-relaxed pt-2.5"
+                      style={{ borderTop: "1px solid rgba(94,92,230,0.12)", color: "rgba(94,92,230,0.8)", fontStyle: "italic" }}
+                    >
+                      {lastCoachNote}
+                    </p>
                   )}
                 </div>
-                <p className="text-[13px] leading-relaxed" style={{ color: "rgba(245,245,247,0.6)" }}>{lastGrading.feedback}</p>
-                {lastCoachNote && (
-                  <p
-                    className="text-[13px] leading-relaxed pt-1"
-                    style={{ borderTop: "1px solid rgba(94,92,230,0.1)", paddingTop: "10px", color: "rgba(94,92,230,0.8)", fontStyle: "italic" }}
-                  >
-                    {lastCoachNote}
-                  </p>
-                )}
               </div>
             )}
 
             {/* Answer input */}
-            <div
-              className="rounded-2xl px-5 py-5"
-              style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)" }}
-            >
-              <p
-                className="text-[11px] font-semibold uppercase tracking-wider mb-3"
-                style={{ color: "rgba(255,255,255,0.25)", letterSpacing: "0.07em" }}
-              >
-                Your answer
-              </p>
-              <AudioRecorder onSubmit={handleAnswer} disabled={submitting || ttsPlaying} />
+            <div className="card-gb-subtle">
+              <div className="card-gb-subtle-inner px-5 py-5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-3 text-dimmer" style={{ letterSpacing: "0.07em" }}>
+                  Your answer
+                </p>
+                <AudioRecorder onSubmit={handleAnswer} disabled={submitting || ttsPlaying} />
 
-              {submitting && (
-                <p
-                  className="text-[12px] mt-3"
-                  style={{ color: "rgba(10,132,255,0.7)", animation: "glow-pulse 1.5s ease-in-out infinite" }}
-                >
-                  Friday is reviewing your answer…
-                </p>
-              )}
-              {error && (
-                <p
-                  className="text-[12px] mt-3 rounded-xl px-3 py-2"
-                  style={{ color: "#FF6B6B", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.15)" }}
-                >
-                  {error}
-                </p>
-              )}
+                {submitting && (
+                  <p className="text-[12px] mt-3 text-accent" style={{ animation: "glow-pulse 1.5s ease-in-out infinite" }}>
+                    Friday is reviewing your answer…
+                  </p>
+                )}
+                {error && (
+                  <p
+                    className="text-[12px] mt-3 rounded-xl px-3 py-2"
+                    style={{ color: "#FF6B6B", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.15)" }}
+                  >
+                    {error}
+                  </p>
+                )}
+              </div>
             </div>
 
           </div>
