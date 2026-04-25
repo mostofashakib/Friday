@@ -206,6 +206,12 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Superpowers specs and plans (local design docs, not for version control)
+docs/superpowers/
+
+# Git worktrees
+.worktrees/
+
 # Friday — secrets and local configs
 backend/.env
 frontend/.env.local
