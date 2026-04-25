@@ -1,10 +1,10 @@
 "use client";
 
-type OrbState = "idle" | "ai-speaking" | "user-speaking" | "countdown";
+type OrbState = "idle" | "ready" | "ai-speaking" | "user-speaking" | "countdown";
 
 interface VoiceOrbProps {
   state: OrbState;
-  onInterrupt?: () => void;
+  onTap?: () => void;
 }
 
 const ORB_CONFIG: Record<OrbState, {
@@ -26,8 +26,19 @@ const ORB_CONFIG: Record<OrbState, {
     animation: "orb-idle-float 4s ease-in-out infinite",
     outerAnimation: "orb-idle-float 4s ease-in-out 0.1s infinite",
     label: "Waiting…",
-    subLabel: "Friday will speak first",
+    subLabel: "Processing…",
     labelColor: "rgba(255,255,255,0.3)",
+  },
+  ready: {
+    coreGradient: "radial-gradient(circle at 38% 35%, rgba(80,160,255,0.7) 0%, rgba(10,132,255,0.6) 40%, rgba(0,80,200,0.5) 100%)",
+    coreGlow: "0 0 18px rgba(10,132,255,0.35), 0 0 40px rgba(10,132,255,0.12), inset 0 1px 0 rgba(255,255,255,0.15)",
+    bloomColor: "rgba(10,132,255,0.1)",
+    outerBloomColor: "rgba(10,132,255,0.04)",
+    animation: "orb-idle-float 4s ease-in-out infinite",
+    outerAnimation: "orb-idle-float 4s ease-in-out 0.1s infinite",
+    label: "Tap to begin",
+    subLabel: "Friday will introduce herself",
+    labelColor: "rgba(10,132,255,0.9)",
   },
   "ai-speaking": {
     coreGradient: "radial-gradient(circle at 38% 35%, rgba(80,160,255,0.95) 0%, rgba(10,132,255,0.85) 40%, rgba(0,80,200,0.75) 100%)",
@@ -64,24 +75,24 @@ const ORB_CONFIG: Record<OrbState, {
   },
 };
 
-export default function VoiceOrb({ state, onInterrupt }: VoiceOrbProps) {
+export default function VoiceOrb({ state, onTap }: VoiceOrbProps) {
   const cfg = ORB_CONFIG[state];
-  const isInterruptable = state === "ai-speaking";
+  const isTappable = state === "ai-speaking" || state === "ready";
 
   return (
     <div className="flex flex-col items-center gap-3">
       {/* Orb */}
       <button
         type="button"
-        onClick={isInterruptable ? onInterrupt : undefined}
-        disabled={!isInterruptable}
+        onClick={isTappable ? onTap : undefined}
+        disabled={!isTappable}
         className="relative flex items-center justify-center focus:outline-none"
         style={{
           width: "clamp(120px, 28vw, 180px)",
           height: "clamp(120px, 28vw, 180px)",
-          cursor: isInterruptable ? "pointer" : "default",
+          cursor: isTappable ? "pointer" : "default",
         }}
-        aria-label={isInterruptable ? "Tap to interrupt Friday" : undefined}
+        aria-label={state === "ready" ? "Tap to begin interview" : state === "ai-speaking" ? "Tap to interrupt Friday" : undefined}
       >
         {/* Outer bloom */}
         <div

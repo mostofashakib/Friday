@@ -18,7 +18,7 @@ _DEFAULT_MODELS: dict[LLMProvider, str] = {
     LLMProvider.ANTHROPIC: "claude-haiku-4-5-20251001",
     LLMProvider.OPENAI: "gpt-4o-mini",
     LLMProvider.GOOGLE: "gemini-1.5-flash",
-    LLMProvider.OLLAMA: "llama3.2",
+    LLMProvider.OLLAMA: "gemma4:26b",
 }
 
 
@@ -70,5 +70,5 @@ class LLMManager:
 
 def get_llm(provider: str | None = None, model: str | None = None) -> LLMManager:
     """Return an LLM manager. Reads LLM_PROVIDER env var; defaults to Anthropic."""
-    p = LLMProvider(provider or os.environ.get("LLM_PROVIDER", "anthropic"))
+    p = LLMProvider(provider or os.environ.get("LLM_PROVIDER", "ollama"))
     return LLMManager(provider=p, model=model)

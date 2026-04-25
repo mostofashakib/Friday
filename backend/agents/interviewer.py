@@ -77,9 +77,8 @@ def _build_context(state: InterviewState) -> str:
         parts.append("Prior questions asked (do not repeat):\n" + "\n".join(prior))
 
     parts.append(
-        "\nSelect a competency (respecting bans and budget), "
-        "call get_competency_history if useful, then search_question_bank. "
-        "If the bank returns nothing, write the question yourself."
+        "\nSelect an appropriate competency from the budget above and write ONE interview question for it. "
+        "Output ONLY the question text, nothing else."
     )
     return "\n".join(parts)
 

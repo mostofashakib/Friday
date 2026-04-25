@@ -45,7 +45,7 @@ class TTSManager:
                 r = await client.post(
                     f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
                     headers={"xi-api-key": api_key},
-                    json={"text": text, "model_id": "eleven_monolingual_v1"},
+                    json={"text": text, "model_id": "eleven_turbo_v2"},
                 )
                 r.raise_for_status()
                 return base64.b64encode(r.content).decode("utf-8")
@@ -54,6 +54,6 @@ class TTSManager:
 
 
 def get_tts(provider: str | None = None) -> TTSManager:
-    """Return a TTSManager. Reads TTS_PROVIDER env var; defaults to openai."""
-    p = TTSProvider(provider or os.environ.get("TTS_PROVIDER", "openai"))
+    """Return a TTSManager. Reads TTS_PROVIDER env var; defaults to elevenlabs."""
+    p = TTSProvider(provider or os.environ.get("TTS_PROVIDER", "elevenlabs"))
     return TTSManager(provider=p)

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { transcribeAudio } from "@/lib/api";
 
-// Web Speech API types (not fully typed in all TS DOM lib versions)
 type SpeechRecognitionCtor = new () => SpeechRecognitionInstance;
 interface SpeechRecognitionInstance {
   continuous: boolean;
@@ -20,6 +19,11 @@ interface SpeechRecognitionResultEvent {
 
 export type RecorderState = "idle" | "listening" | "countdown";
 
+// Silence detection tuning
+const SILENCE_THRESHOLD = 0.01;   // RMS amplitude below this = silent
+const SILENCE_DURATION_MS = 5_000; // ms of silence before countdown
+const VAD_POLL_MS = 100;           // how often to sample audio energy
+
 interface UseVoiceRecorderOptions {
   sessionId: string;
   onSubmit: (transcript: string) => void;
@@ -31,14 +35,19 @@ export function useVoiceRecorder({ sessionId, onSubmit }: UseVoiceRecorderOption
   const [countdownSeconds, setCountdownSeconds] = useState(5);
   const [isSupported, setIsSupported] = useState(false);
 
-  // Refs hold the live values so timer callbacks don't capture stale closures
   const recorderStateRef = useRef<RecorderState>("idle");
   const liveTranscriptRef = useRef("");
   const countdownSecondsRef = useRef(5);
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // VAD refs
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const vadTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const silenceSinceRef = useRef<number | null>(null); // timestamp when silence started
+
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -50,11 +59,9 @@ export function useVoiceRecorder({ sessionId, onSubmit }: UseVoiceRecorderOption
     setIsSupported(!!SR && typeof MediaRecorder !== "undefined");
   }, []);
 
-  function clearSilenceTimer() {
-    if (silenceTimerRef.current) {
-      clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
+  function setStateSync(s: RecorderState) {
+    recorderStateRef.current = s;
+    setRecorderState(s);
   }
 
   function clearCountdownTimer() {
@@ -64,9 +71,17 @@ export function useVoiceRecorder({ sessionId, onSubmit }: UseVoiceRecorderOption
     }
   }
 
-  function setStateSync(s: RecorderState) {
-    recorderStateRef.current = s;
-    setRecorderState(s);
+  function stopVAD() {
+    if (vadTimerRef.current) {
+      clearInterval(vadTimerRef.current);
+      vadTimerRef.current = null;
+    }
+    silenceSinceRef.current = null;
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+      analyserRef.current = null;
+    }
   }
 
   function startCountdown() {
@@ -84,27 +99,65 @@ export function useVoiceRecorder({ sessionId, onSubmit }: UseVoiceRecorderOption
     }, 1000);
   }
 
-  function resetSilenceTimer() {
-    clearSilenceTimer();
-    silenceTimerRef.current = setTimeout(() => {
-      if (recorderStateRef.current === "listening") {
-        startCountdown();
+  function getRMS(analyser: AnalyserNode): number {
+    const buf = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    return Math.sqrt(sum / buf.length);
+  }
+
+  function startVAD(stream: MediaStream) {
+    const ctx = new AudioContext();
+    const source = ctx.createMediaStreamSource(stream);
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    audioContextRef.current = ctx;
+    analyserRef.current = analyser;
+    silenceSinceRef.current = null;
+
+    vadTimerRef.current = setInterval(() => {
+      const state = recorderStateRef.current;
+      if (state === "idle") return;
+
+      const rms = getRMS(analyser);
+      const isSpeaking = rms > SILENCE_THRESHOLD;
+
+      if (isSpeaking) {
+        // User is speaking — reset silence clock and cancel any active countdown
+        silenceSinceRef.current = null;
+        if (state === "countdown") {
+          clearCountdownTimer();
+          countdownSecondsRef.current = 5;
+          setCountdownSeconds(5);
+          setStateSync("listening");
+        }
+      } else {
+        // User is silent
+        if (state === "listening") {
+          if (silenceSinceRef.current === null) {
+            silenceSinceRef.current = Date.now();
+          } else if (Date.now() - silenceSinceRef.current >= SILENCE_DURATION_MS) {
+            silenceSinceRef.current = null;
+            startCountdown();
+          }
+        }
+        // During countdown: let countdown continue (VAD not resetting it here)
       }
-    }, 2000);
+    }, VAD_POLL_MS);
   }
 
   async function submitRecording() {
-    // Stop SpeechRecognition
+    stopVAD();
     recognitionRef.current?.stop();
 
-    // Stop MediaRecorder and wait for final ondataavailable
     const mr = mediaRecorderRef.current;
     if (mr && mr.state !== "inactive") {
       await new Promise<void>((resolve) => {
         mr.onstop = () => resolve();
         mr.stop();
       });
-      // Release microphone
       mr.stream.getTracks().forEach((t) => t.stop());
     }
 
@@ -119,7 +172,6 @@ export function useVoiceRecorder({ sessionId, onSubmit }: UseVoiceRecorderOption
       onSubmit(fallback);
     }
 
-    // Reset for next turn
     setLiveTranscript("");
     liveTranscriptRef.current = "";
     chunksRef.current = [];
@@ -133,15 +185,14 @@ export function useVoiceRecorder({ sessionId, onSubmit }: UseVoiceRecorderOption
     const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!SR) return;
 
-    // Reset
     setLiveTranscript("");
     liveTranscriptRef.current = "";
     chunksRef.current = [];
-    clearSilenceTimer();
     clearCountdownTimer();
+    stopVAD();
     setStateSync("listening");
 
-    // SpeechRecognition — live transcript display
+    // SpeechRecognition — live transcript display only (not used for silence detection)
     const rec = new SR();
     rec.continuous = true;
     rec.interimResults = true;
@@ -154,37 +205,31 @@ export function useVoiceRecorder({ sessionId, onSubmit }: UseVoiceRecorderOption
       }
       setLiveTranscript(full);
       liveTranscriptRef.current = full;
-
-      // Cancel countdown if speech resumes
-      if (recorderStateRef.current === "countdown") {
-        clearCountdownTimer();
-        countdownSecondsRef.current = 5;
-        setCountdownSeconds(5);
-        setStateSync("listening");
-      }
-      resetSilenceTimer();
     };
     rec.onend = () => {
-      // Chrome stops SR after ~60s silence; restart if we're still supposed to be listening
       if (recorderStateRef.current === "listening" || recorderStateRef.current === "countdown") {
-        try { rec.start(); } catch { /* ignore if already stopping */ }
+        try { rec.start(); } catch { /* ignore */ }
       }
     };
     recognitionRef.current = rec;
     rec.start();
-    resetSilenceTimer();
 
-    // MediaRecorder — raw audio for Whisper
+    // Microphone stream — used for both MediaRecorder (Whisper) and VAD
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      // VAD using Web Audio API
+      startVAD(stream);
+
+      // MediaRecorder for Whisper transcription
       const mr = new MediaRecorder(stream);
       mr.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
-      mr.start(250); // chunk every 250 ms
+      mr.start(250);
       mediaRecorderRef.current = mr;
     } catch {
-      // Microphone denied — continue with Web Speech only (Whisper path disabled)
+      // Microphone denied — Web Speech transcript only, no VAD
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
@@ -195,7 +240,7 @@ export function useVoiceRecorder({ sessionId, onSubmit }: UseVoiceRecorderOption
     setCountdownSeconds(5);
     if (recorderStateRef.current === "countdown") {
       setStateSync("listening");
-      resetSilenceTimer();
+      silenceSinceRef.current = null; // restart silence clock
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

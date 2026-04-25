@@ -8,7 +8,7 @@ import DifficultyMeter from "@/components/interview/DifficultyMeter";
 import VoiceOrb from "@/components/interview/VoiceOrb";
 import { useVoiceRecorder } from "@/hooks/useVoiceRecorder";
 import { getHistory, submitTurn, interruptTTS, synthesizeTTS } from "@/lib/api";
-import type { Message, Grading } from "@/types";
+import type { Message } from "@/types";
 
 const MAX_TURNS = 8;
 
@@ -30,13 +30,12 @@ export default function InterviewSessionPage() {
   const [isFollowup, setIsFollowup] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
-  const [lastGrading, setLastGrading] = useState<Grading | null>(null);
-  const [lastCoachNote, setLastCoachNote] = useState("");
+  const [sessionStarted, setSessionStarted] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const hasPlayedIntroRef = useRef(false);
+  const introTextRef = useRef("");
 
   const recorder = useVoiceRecorder({
     sessionId,
@@ -44,7 +43,9 @@ export default function InterviewSessionPage() {
   });
 
   // Derived orb state — single source of truth
-  const orbState = submitting
+  const orbState = !sessionStarted
+    ? "ready"
+    : submitting
     ? "idle"
     : ttsPlaying
     ? "ai-speaking"
@@ -72,20 +73,12 @@ export default function InterviewSessionPage() {
         setLoading(false);
       }
 
-      if (!lastInterviewer || hasPlayedIntroRef.current) return;
-      hasPlayedIntroRef.current = true;
+      if (!lastInterviewer) return;
 
       const isFirstQuestion = lastInterviewer.turn_number === 1 && !lastInterviewer.is_followup;
-      const ttsText = isFirstQuestion
+      introTextRef.current = isFirstQuestion
         ? `Hi, my name is Friday. I'm your AI interview coach for today's session. I'll be asking you a series of questions and providing feedback on your responses to help you improve. Let's get started with your first question. ${lastInterviewer.content}`
         : lastInterviewer.content;
-
-      try {
-        const { audio } = await synthesizeTTS(ttsText, sessionId);
-        playTTS(audio);
-      } catch {
-        playTTS(null);
-      }
     }
     load();
   }, [sessionId]);
@@ -112,7 +105,18 @@ export default function InterviewSessionPage() {
     el.play().catch(cleanup);
   }
 
-  async function handleOrbInterrupt() {
+  async function handleOrbTap() {
+    if (!sessionStarted) {
+      setSessionStarted(true);
+      try {
+        const { audio } = await synthesizeTTS(introTextRef.current, sessionId);
+        playTTS(audio);
+      } catch {
+        playTTS(null);
+      }
+      return;
+    }
+    // Interrupt TTS while speaking
     audioRef.current?.pause();
     setTtsPlaying(false);
     await interruptTTS(sessionId);
@@ -120,17 +124,17 @@ export default function InterviewSessionPage() {
   }
 
   async function handleAnswer(answer: string) {
-    if (!answer.trim()) return;
+    const effectiveAnswer = answer.trim() || "[No response — candidate was silent]";
     setSubmitting(true);
     setError("");
     try {
-      const result = await submitTurn(sessionId, answer);
+      const result = await submitTurn(sessionId, effectiveAnswer);
 
       const userMsg: Message = {
         id: crypto.randomUUID(),
         session_id: sessionId,
         role: "user",
-        content: answer,
+        content: effectiveAnswer,
         competency: result.grading?.competency ?? null,
         score: result.grading?.score ?? null,
         turn_number: result.turn - 1,
@@ -138,8 +142,6 @@ export default function InterviewSessionPage() {
         created_at: new Date().toISOString(),
       };
       setMessages((prev) => [...prev, userMsg]);
-      setLastGrading(result.grading);
-      setLastCoachNote(result.coaching_note);
 
       if (result.session_complete) {
         router.push(`/report/${sessionId}`);
@@ -163,7 +165,9 @@ export default function InterviewSessionPage() {
         setCurrentTurn(result.turn);
         setDifficulty(result.difficulty);
         setIsFollowup(result.is_followup);
-        playTTS(result.tts_audio);
+        const audio = result.tts_audio
+          ?? await synthesizeTTS(result.question, sessionId).then((r) => r.audio).catch(() => null);
+        playTTS(audio);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to submit answer");
@@ -207,12 +211,72 @@ export default function InterviewSessionPage() {
           {/* Hero orb */}
           <div className="card-gb-subtle">
             <div className="card-gb-subtle-inner px-5 py-8 sm:py-14 md:py-20 flex flex-col items-center">
-              <VoiceOrb state={orbState} onInterrupt={handleOrbInterrupt} />
+              <VoiceOrb state={orbState} onTap={handleOrbTap} />
             </div>
           </div>
 
-          {/* Current question */}
-          {currentQuestion && (
+          {/* Live transcript */}
+          {(orbState === "user-speaking" || orbState === "countdown") && recorder.liveTranscript && (
+            <div className="card-gb-subtle">
+              <div className="card-gb-subtle-inner px-5 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-dimmer" style={{ letterSpacing: "0.07em" }}>
+                  Your words
+                </p>
+                <p className="text-[13px] leading-relaxed" style={{ color: "rgba(245,245,247,0.7)" }}>
+                  {recorder.liveTranscript}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Countdown strip */}
+          {orbState === "countdown" && (
+            <div
+              className="flex items-center gap-3 px-5 py-3 rounded-xl"
+              style={{ background: "rgba(255,159,10,0.07)", border: "1px solid rgba(255,159,10,0.15)" }}
+            >
+              <div className="flex-1 h-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
+                <div
+                  className="h-full rounded-full transition-all duration-1000"
+                  style={{
+                    width: `${(recorder.countdownSeconds / 5) * 100}%`,
+                    background: "#FF9F0A",
+                  }}
+                />
+              </div>
+              <span className="text-[12px] font-semibold tabular-nums" style={{ color: "rgba(255,159,10,0.9)" }}>
+                {recorder.countdownSeconds}s
+              </span>
+              <button
+                type="button"
+                onClick={recorder.cancel}
+                className="text-[12px] font-medium px-3 py-1 rounded-lg transition-all"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
+              >
+                Keep talking
+              </button>
+            </div>
+          )}
+
+          {/* Submitting indicator */}
+          {submitting && (
+            <p className="text-[12px] text-accent" style={{ animation: "glow-pulse 1.5s ease-in-out infinite" }}>
+              Friday is thinking of the next question…
+            </p>
+          )}
+
+          {/* General error */}
+          {error && (
+            <p
+              className="text-[12px] rounded-xl px-3 py-2"
+              style={{ color: "#FF6B6B", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.15)" }}
+            >
+              {error}
+            </p>
+          )}
+
+          {/* Current question — shown once session starts */}
+          {sessionStarted && currentQuestion && (
             <QuestionCard
               question={currentQuestion}
               turn={currentTurn}
@@ -220,101 +284,6 @@ export default function InterviewSessionPage() {
               isFollowup={isFollowup}
             />
           )}
-
-            {/* Live transcript */}
-            {(orbState === "user-speaking" || orbState === "countdown") && recorder.liveTranscript && (
-              <div className="card-gb-subtle">
-                <div className="card-gb-subtle-inner px-5 py-4">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider mb-2 text-dimmer" style={{ letterSpacing: "0.07em" }}>
-                    Your words
-                  </p>
-                  <p className="text-[13px] leading-relaxed" style={{ color: "rgba(245,245,247,0.7)" }}>
-                    {recorder.liveTranscript}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {/* Countdown strip */}
-            {orbState === "countdown" && (
-              <div
-                className="flex items-center gap-3 px-5 py-3 rounded-xl"
-                style={{ background: "rgba(255,159,10,0.07)", border: "1px solid rgba(255,159,10,0.15)" }}
-              >
-                <div className="flex-1 h-0.5 rounded-full" style={{ background: "rgba(255,255,255,0.08)" }}>
-                  <div
-                    className="h-full rounded-full transition-all duration-1000"
-                    style={{
-                      width: `${(recorder.countdownSeconds / 5) * 100}%`,
-                      background: "#FF9F0A",
-                    }}
-                  />
-                </div>
-                <span className="text-[12px] font-semibold tabular-nums" style={{ color: "rgba(255,159,10,0.9)" }}>
-                  {recorder.countdownSeconds}s
-                </span>
-                <button
-                  type="button"
-                  onClick={recorder.cancel}
-                  className="text-[12px] font-medium px-3 py-1 rounded-lg transition-all"
-                  style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}
-                >
-                  Keep talking
-                </button>
-              </div>
-            )}
-
-            {/* Coach feedback */}
-            {lastGrading && (
-              <div className="card-gb-purple">
-                <div className="card-gb-purple-inner px-5 py-4 space-y-2.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-[12px] font-semibold" style={{ color: "rgba(94,92,230,0.9)" }}>
-                      Coach feedback
-                    </span>
-                    <span
-                      className="text-[11px] font-medium px-1.5 py-0.5 rounded-md"
-                      style={{
-                        background: lastGrading.score >= 4 ? "rgba(48,209,88,0.12)" : lastGrading.score >= 3 ? "rgba(255,159,10,0.12)" : "rgba(255,69,58,0.12)",
-                        color: lastGrading.score >= 4 ? "#30D158" : lastGrading.score >= 3 ? "#FF9F0A" : "#FF453A",
-                        boxShadow: lastGrading.score >= 4 ? "0 0 8px rgba(48,209,88,0.2)" : lastGrading.score >= 3 ? "0 0 8px rgba(255,159,10,0.2)" : "0 0 8px rgba(255,69,58,0.2)",
-                      }}
-                    >
-                      {lastGrading.score}/5
-                    </span>
-                    {lastGrading.competency && (
-                      <span className="text-[11px] text-dimmer">{lastGrading.competency}</span>
-                    )}
-                  </div>
-                  <p className="text-[13px] leading-relaxed" style={{ color: "rgba(245,245,247,0.6)" }}>{lastGrading.feedback}</p>
-                  {lastCoachNote && (
-                    <p
-                      className="text-[13px] leading-relaxed pt-2.5"
-                      style={{ borderTop: "1px solid rgba(94,92,230,0.12)", color: "rgba(94,92,230,0.8)", fontStyle: "italic" }}
-                    >
-                      {lastCoachNote}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Submitting indicator */}
-            {submitting && (
-              <p className="text-[12px] text-accent" style={{ animation: "glow-pulse 1.5s ease-in-out infinite" }}>
-                Friday is reviewing your answer…
-              </p>
-            )}
-
-            {/* General error */}
-            {error && (
-              <p
-                className="text-[12px] rounded-xl px-3 py-2"
-                style={{ color: "#FF6B6B", background: "rgba(255,107,107,0.08)", border: "1px solid rgba(255,107,107,0.15)" }}
-              >
-                {error}
-              </p>
-            )}
 
         </div>
       </main>
