@@ -1,3 +1,4 @@
+# Developed by Mostofa Shakib (www.mostofashakib.com)
 from __future__ import annotations
 import os
 from enum import Enum

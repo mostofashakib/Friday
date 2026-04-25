@@ -1,3 +1,4 @@
+# Developed by Mostofa Shakib (www.mostofashakib.com)
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI

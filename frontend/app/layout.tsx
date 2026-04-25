@@ -1,3 +1,4 @@
+// Developed by Mostofa Shakib (www.mostofashakib.com)
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Syne } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";

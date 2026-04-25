@@ -1,3 +1,4 @@
+// Developed by Mostofa Shakib (www.mostofashakib.com)
 export default function Footer() {
   return (
     <footer className="mt-20 py-10 px-6" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>

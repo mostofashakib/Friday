@@ -7,8 +7,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=next.js&logoColor=white)](https://nextjs.org)
-[![Powered by Claude](https://img.shields.io/badge/Powered%20by-Claude%20AI-orange)](https://anthropic.com)
 [![LangGraph](https://img.shields.io/badge/Multi--Agent-LangGraph-green)](https://langchain-ai.github.io/langgraph/)
+[![Ollama](https://img.shields.io/badge/Default%20LLM-Ollama-black)](https://ollama.com)
 
 [Features](#features) · [Architecture](#architecture) · [Getting Started](#getting-started) · [API Reference](#api-reference) · [Deployment](#deployment)
 
@@ -18,9 +18,9 @@
 
 ## What is Friday?
 
-**Friday** is a full-stack AI mock interview simulator. It conducts adaptive behavioral interviews entirely through voice — Friday speaks questions aloud, listens to your answers, grades every response in real time, and gives specific coaching feedback. Under the hood, five specialized AI agents collaborate via a LangGraph pipeline to keep the session coherent and calibrated to your level.
+**Friday** is a full-stack AI mock interview simulator. It conducts adaptive behavioral interviews entirely through voice — Friday speaks questions aloud, listens to your answers, grades every response in real time, and gives specific coaching feedback at the end. Under the hood, five specialized AI agents collaborate via a LangGraph pipeline to keep the session coherent and calibrated to your level.
 
-**Stack:** Anthropic Claude · LangGraph · FastAPI · Next.js · Supabase · OpenAI Whisper · OpenAI TTS
+**Default stack:** Ollama (local LLM) · ElevenLabs TTS/STT · LangGraph · FastAPI · Next.js · Supabase
 
 ---
 
@@ -30,12 +30,16 @@
 
 The interview runs entirely through voice with no manual input required:
 
-- **Friday speaks first** — questions are synthesized via OpenAI TTS and played automatically at the start of each turn
-- **Automatic silence detection** — the microphone opens after Friday finishes speaking; after 2 seconds of silence, a 5-second countdown begins, then your answer is submitted automatically
-- **Live transcript** — Web Speech API shows a real-time preview of what you're saying while you speak
-- **Server-side transcription** — the final audio is transcribed by OpenAI Whisper (`whisper-1`) for accuracy
-- **Interrupt** — tap the animated orb while Friday is speaking to cut in immediately
-- **Configurable TTS provider** — defaults to OpenAI TTS (`tts-1`, voice `nova`); swap to ElevenLabs via `TTS_PROVIDER=elevenlabs`
+- **Tap to begin** — a blue orb greets you on load; tapping it triggers Friday's spoken introduction and reveals the first question
+- **Friday speaks every question** — each question is synthesized via ElevenLabs TTS and played through the browser before the microphone opens
+- **Real-time voice activity detection** — the Web Audio API `AnalyserNode` samples microphone amplitude at 100 ms intervals; 5 seconds of measured silence (RMS below threshold) starts the countdown
+- **Countdown to submit** — a 5-second visual countdown appears after silence is detected; speaking at any point cancels it and resets the clock
+- **Live transcript** — Web Speech API shows a real-time preview of what you're saying while the countdown is running
+- **Server-side transcription** — the final audio is transcribed by ElevenLabs Scribe v2 for accuracy; falls back to the Web Speech transcript if STT fails
+- **Interrupt** — tap the animated orb while Friday is speaking to cut in immediately and start recording
+- **Question card** — the current question is displayed in text form beneath the orb once the session begins (not before)
+- **Configurable TTS provider** — defaults to ElevenLabs (`eleven_turbo_v2`); swap to OpenAI TTS via `TTS_PROVIDER=openai`
+- **Configurable STT provider** — defaults to ElevenLabs Scribe v2; swap to OpenAI Whisper via `STT_PROVIDER=openai`
 
 ### Five-Agent Interview Pipeline
 
@@ -43,11 +47,11 @@ A stateful LangGraph pipeline where five specialized agents share session memory
 
 | Agent | Trigger | Role |
 |---|---|---|
-| **Interviewer** | Start + after each graded turn | Selects a calibrated question from the 135-question bank using `search_question_bank` and `get_competency_history`. Follows Coach directives. |
+| **Interviewer** | Start + after each graded turn | Selects a calibrated question from the 135-question bank. Follows Coach directives. |
 | **Grader** | Every user answer | Scores 1–5, identifies the competency being tested, lists strengths and gaps. |
 | **Clarifier** | Score ≤ 2 | Generates a probing follow-up to test foundational understanding of the weak area. |
 | **Followup** | Score 3–4 | Runs RAG over prior answers. Triggers a targeted follow-up when a recurring gap is found. |
-| **Coach** | After most turns | Bans saturated competencies, writes directives for the Interviewer, and produces a concise coaching note shown to the user. |
+| **Coach** | After most turns | Bans saturated competencies, writes directives for the Interviewer, collects coaching notes for the final report. |
 
 ### Conditional Routing
 
@@ -90,13 +94,13 @@ Every answer is embedded (`text-embedding-3-small`) and stored in Supabase pgvec
 ### Multi-Provider LLM Support
 
 ```
-LLM_PROVIDER=anthropic   → Claude Haiku 4.5 (default)
+LLM_PROVIDER=ollama      → gemma4:26b (default, local — requires Ollama running)
+LLM_PROVIDER=anthropic   → Claude Haiku 4.5
 LLM_PROVIDER=openai      → GPT-4o Mini
 LLM_PROVIDER=google      → Gemini 1.5 Flash
-LLM_PROVIDER=ollama      → Llama 3.2 (local)
 ```
 
-Each provider is a separate class implementing `BaseLLMProvider`. Switching providers is a single env var change — no code changes required. Adding a new provider means creating one file in `llm/providers/` and registering it in the factory.
+Each provider is a separate class implementing `BaseLLMProvider`. Switching providers is a single env var change — no code changes required. Ollama's thinking/reasoning mode is disabled by default (`think: false`) so questions are generated directly without token-budget issues.
 
 ### Post-Session Report
 
@@ -116,11 +120,13 @@ After all turns, Friday generates a report with:
 │                                                                        │
 │   Landing Page    Interview Setup    Active Session    Report          │
 │                   GitHub / Scholar   VoiceOrb UI      Scores/Notes    │
-│                   Resume / Job URL   Auto-silence STT  Transcript     │
+│                   Resume / Job URL   VAD silence det.  Transcript     │
 │                                                                        │
-│   Web Speech API (live transcript)   OpenAI TTS / ElevenLabs          │
+│   Web Audio API (VAD)  Web Speech API (live transcript)               │
+│   ElevenLabs TTS · ElevenLabs STT · catch-all API proxy route        │
 └─────────────────────────────┬────────────────────────────────────────┘
                               │ HTTP / REST (multipart + JSON)
+                              │ via Next.js catch-all /api/[...path]
                               ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │                  API Layer (FastAPI — thin HTTP handlers)             │
@@ -152,7 +158,7 @@ After all turns, Friday generates a report with:
 │    anthropic.py          │   │  tts_manager.py    TTS adapter         │
 │    openai.py             │   │  stt_manager.py    STT adapter         │
 │    google.py             │   │  github / scholar / resume / scraper   │
-│    ollama.py             │   └────────────────────────────────────────┘
+│    ollama.py  (default)  │   └────────────────────────────────────────┘
 │  manager.py  factory     │
 └─────────────────────────┘
                               │
@@ -174,13 +180,15 @@ After all turns, Friday generates a report with:
 | **Frontend** | Next.js 15 App Router, Tailwind CSS v4, TypeScript |
 | **Backend** | FastAPI, Python 3.11+, uvicorn |
 | **Agent Orchestration** | LangGraph (stateful multi-agent with conditional edges) |
-| **LLM** | Anthropic Claude (default) — OpenAI, Google Gemini, Ollama supported |
-| **TTS** | OpenAI `tts-1` (default) — ElevenLabs as alternative |
-| **STT** | OpenAI Whisper `whisper-1` (server-side) + Web Speech API (live display) |
+| **LLM** | Ollama `gemma4:26b` (default, local) — Anthropic Claude, OpenAI, Google Gemini supported |
+| **TTS** | ElevenLabs `eleven_turbo_v2` (default) — OpenAI `tts-1` as alternative |
+| **STT** | ElevenLabs Scribe v2 (server-side, default) — OpenAI Whisper as alternative; Web Speech API for live display |
+| **Voice Activity Detection** | Web Audio API `AnalyserNode` — 100 ms RMS sampling, 5 s silence threshold |
 | **RAG Embeddings** | OpenAI `text-embedding-3-small` |
 | **Vector Store** | Supabase pgvector |
 | **Database** | Supabase (PostgreSQL) |
 | **Auth** | Supabase Auth (bypassable via `AUTH_ENABLED` flag) |
+| **Frontend Proxy** | Next.js catch-all API route (`/api/[...path]`) — avoids stale keep-alive connection issues |
 | **Frontend Hosting** | Vercel |
 | **Backend Hosting** | GCP Cloud Run |
 
@@ -196,11 +204,34 @@ Every LLM provider implements `BaseLLMProvider` in `llm/base.py`:
 class BaseLLMProvider(ABC):
     async def complete(self, system, messages, max_tokens) -> str: ...
     async def complete_with_tools(self, system, messages, tools, tool_executor, ...) -> str:
-        # Default: fall back to plain completion (overridden by Anthropic for native tool use)
+        # Default: fall back to plain completion
+        # Ollama overrides this to strip tool-call syntax and inject a no-tool instruction
         return await self.complete(system, messages, max_tokens)
 ```
 
 `llm/manager.py` is a thin factory — it reads `LLM_PROVIDER`, constructs the right provider class, and delegates all calls to it. Swapping providers is a single env var change. Adding a new one means creating one file in `llm/providers/` and one `case` in `_build_provider()`.
+
+**Ollama-specific behaviour:** `gemma4:26b` uses a thinking/reasoning mode that can exhaust its token budget before producing output. The Ollama provider sends `think: false` to disable this, falls back to the `thinking` field if `content` is empty, and strips any tool-call syntax from responses since Ollama doesn't execute tools natively.
+
+### Voice Activity Detection
+
+Silence detection is driven by the **Web Audio API**, not the Web Speech API:
+
+```
+getUserMedia stream
+      │
+      ▼
+AudioContext → AnalyserNode (fftSize 512)
+      │
+      ▼  every 100 ms
+  getRMS() → compare against SILENCE_THRESHOLD (0.01)
+      │
+  speaking?  ──yes──▶ reset silence clock · cancel any active countdown
+      │
+  silent ≥ 5 s ────▶ start 5-second countdown · submit on zero
+```
+
+This makes silence detection independent of speech recognition latency. The Web Speech API is kept solely for the live transcript display.
 
 ### Agent Pipeline Separation
 
@@ -214,12 +245,9 @@ The agent pipeline (`agents/orchestrator.py`) is decoupled from HTTP and databas
 
 `run_turn(state)` in the orchestrator has no DB calls and no audio synthesis. The API layer owns those side effects and calls the orchestrator as a black box.
 
-### Tool Separation
+### Frontend Proxy
 
-Agent tools are split across two files by responsibility:
-
-- `tools/question_bank.py` — question data (135 questions across 9 competencies × 5 levels), competency normalization, and lookup functions
-- `tools/agent_tools.py` — tool schemas (Anthropic JSON format), state mutators (`ban_competency`, `set_directive`, etc.), and the executor factory
+All frontend API calls go through a Next.js catch-all route at `app/api/[...path]/route.ts`, which proxies to the FastAPI backend. This avoids the stale keep-alive connection issues (`ECONNRESET`) that arise when using Next.js `rewrites` as a proxy.
 
 ---
 
@@ -227,7 +255,7 @@ Agent tools are split across two files by responsibility:
 
 ```
 Friday/
-├── run.sh              Start backend + frontend (clears ports first)
+├── run.sh              Start backend + frontend
 ├── kill.sh             Stop all Friday processes
 ├── setup.sh            First-time setup (venv, npm install, .env files)
 ├── deploy.sh           Build + push to GCP, deploy to Cloud Run + Vercel
@@ -241,7 +269,7 @@ Friday/
 │   │   ├── state.py             InterviewState TypedDict (shared across all agents)
 │   │   ├── graph.py             LangGraph graph definition + routing functions
 │   │   ├── orchestrator.py      Pipeline runner — routes agents, builds trace, no DB/HTTP
-│   │   ├── interviewer.py       Question selection via LLM + tool use (no audio)
+│   │   ├── interviewer.py       Question selection (LLM + optional tool use)
 │   │   ├── grader.py            Answer scoring (1–5, competency, gaps) + score aggregation
 │   │   ├── clarifier.py         Probing questions for score ≤ 2
 │   │   ├── followup.py          RAG-driven targeted follow-ups for score 3–4
@@ -251,8 +279,8 @@ Friday/
 │   │   ├── question_bank.py     135-question bank, competency lookup, normalization
 │   │   ├── agent_tools.py       Tool schemas (JSON), state mutators, executor factory
 │   │   ├── tts.py               TTS generation + interrupt flag logic
-│   │   ├── tts_manager.py       TTS provider adapter (OpenAI / ElevenLabs)
-│   │   ├── stt_manager.py       STT provider adapter (OpenAI Whisper)
+│   │   ├── tts_manager.py       TTS provider adapter (ElevenLabs default / OpenAI)
+│   │   ├── stt_manager.py       STT provider adapter (ElevenLabs Scribe default / Whisper)
 │   │   ├── github.py            GitHub repo fetch + LLM summarization
 │   │   ├── scholar.py           Google Scholar publication lookup
 │   │   ├── resume.py            PDF / text resume extraction
@@ -265,7 +293,7 @@ Friday/
 │   │       ├── anthropic.py     Claude — full tool-use loop
 │   │       ├── openai.py        GPT — plain completion
 │   │       ├── google.py        Gemini — chat session
-│   │       └── ollama.py        Ollama — local httpx call
+│   │       └── ollama.py        Ollama — local httpx, think:false, tool-call stripping
 │   │
 │   ├── rag/
 │   │   ├── embeddings.py        OpenAI text-embedding-3-small
@@ -273,7 +301,7 @@ Friday/
 │   │
 │   ├── db/
 │   │   ├── client.py            Supabase client singleton
-│   │   ├── queries.py           All database helpers (local in-memory + Supabase)
+│   │   ├── queries.py           All database helpers
 │   │   └── schema.sql           Run once in Supabase SQL editor
 │   │
 │   ├── api/
@@ -281,32 +309,33 @@ Friday/
 │   │   └── tts.py               TTS synthesis, interrupt, and transcription endpoints
 │   │
 │   └── utils/
-│       └── json_utils.py        parse_llm_json — strips markdown fences before JSON.loads
+│       └── json_utils.py        parse_llm_json — strips markdown fences, safe fallback
 │
 └── frontend/
     ├── app/
     │   ├── layout.tsx            Root layout + SEO metadata
     │   ├── page.tsx              Landing page
     │   ├── globals.css           Design system (glassmorphism + orb animations)
+    │   ├── api/[...path]/        Catch-all proxy route to FastAPI backend
     │   ├── login/page.tsx
     │   ├── signup/page.tsx
     │   ├── interview/
     │   │   ├── setup/page.tsx    Interview configuration + context upload
-    │   │   └── [sessionId]/page.tsx  Active session (voice-first)
+    │   │   └── [sessionId]/page.tsx  Active session (voice-first, tap-to-start)
     │   └── report/
     │       └── [sessionId]/page.tsx  Post-session coaching report
     │
     ├── components/
     │   ├── landing/              Hero, Features, HowItWorks, CTA
-    │   ├── layout/               Navbar
+    │   ├── layout/               Navbar, Footer
     │   └── interview/
-    │       ├── VoiceOrb.tsx      Animated orb (idle / ai-speaking / user-speaking / countdown)
+    │       ├── VoiceOrb.tsx      Animated orb (ready / idle / ai-speaking / user-speaking / countdown)
     │       ├── DifficultyMeter.tsx  Progress bar + difficulty dots
-    │       ├── QuestionCard.tsx  Current question display
+    │       ├── QuestionCard.tsx  Current question (shown after session starts)
     │       └── TranscriptPanel.tsx  Full Q&A transcript (report page)
     │
     ├── hooks/
-    │   └── useVoiceRecorder.ts  Silence detection + MediaRecorder + Whisper submission
+    │   └── useVoiceRecorder.ts  Web Audio VAD + MediaRecorder + ElevenLabs STT submission
     │
     └── lib/
         ├── api.ts                Backend API client
@@ -321,11 +350,12 @@ Friday/
 
 ### Prerequisites
 
-| Tool | Version |
-|---|---|
-| Python | 3.11+ |
-| Node.js | 18+ |
-| npm | 9+ |
+| Tool | Version | Notes |
+|---|---|---|
+| Python | 3.11+ | |
+| Node.js | 18+ | |
+| npm | 9+ | |
+| Ollama | latest | Required for default LLM — [install here](https://ollama.com) |
 
 ### 1. Clone and set up
 
@@ -337,17 +367,23 @@ bash setup.sh
 
 `setup.sh` creates a Python virtual environment, installs backend dependencies, installs frontend npm packages, and copies `.env.example` files for you to fill in.
 
-### 2. Fill in your environment variables
+### 2. Pull the default model (Ollama)
+
+```bash
+ollama pull gemma4:26b
+```
+
+To use a different LLM instead, set `LLM_PROVIDER` in `backend/.env` (see below).
+
+### 3. Fill in your environment variables
 
 Open `backend/.env` and add your API keys (see [Environment Variables](#environment-variables) below).
 
-Open `frontend/.env.local` and set `NEXT_PUBLIC_API_URL=http://localhost:8000`.
-
-### 3. Set up the database
+### 4. Set up the database
 
 Run `backend/db/schema.sql` in the Supabase SQL editor of your project. This creates the four tables Friday needs.
 
-### 4. Start the app
+### 5. Start the app
 
 ```bash
 bash run.sh
@@ -373,19 +409,20 @@ Set `AUTH_ENABLED = false` in `frontend/lib/auth-config.ts` to skip Supabase Aut
 
 ### Backend (`backend/.env`)
 
-| Variable | Required | Description |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | ✅ | Claude API key |
-| `OPENAI_API_KEY` | ✅ | Used for TTS (default), Whisper STT, and RAG embeddings |
-| `SUPABASE_URL` | ✅ | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service role key (server-only) |
-| `CORS_ORIGINS` | ✅ | Comma-separated allowed origins (e.g. `http://localhost:3000`) |
-| `TTS_PROVIDER` | ❌ | `openai` (default) \| `elevenlabs` |
-| `STT_PROVIDER` | ❌ | `openai` (default, Whisper) |
-| `ELEVENLABS_API_KEY` | ❌ | Only needed when `TTS_PROVIDER=elevenlabs` |
-| `ELEVENLABS_VOICE_ID` | ❌ | ElevenLabs voice ID (has a sensible default) |
-| `LLM_PROVIDER` | ❌ | `anthropic` (default) \| `openai` \| `google` \| `ollama` |
-| `MAX_TURNS` | ❌ | Interview length in turns (default: `8`) |
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `SUPABASE_URL` | ✅ | — | Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | — | Service role key (server-only) |
+| `CORS_ORIGINS` | ✅ | — | Comma-separated allowed origins (e.g. `http://localhost:3000`) |
+| `ELEVENLABS_API_KEY` | ✅ | — | Required for TTS and STT (defaults) |
+| `ELEVENLABS_VOICE_ID` | ❌ | `EXAVITQu4vr4xnSDxMaL` | ElevenLabs voice ID |
+| `OPENAI_API_KEY` | ❌ | — | Required for RAG embeddings and if using OpenAI TTS/STT/LLM |
+| `ANTHROPIC_API_KEY` | ❌ | — | Required only if `LLM_PROVIDER=anthropic` |
+| `TTS_PROVIDER` | ❌ | `elevenlabs` | `elevenlabs` \| `openai` |
+| `STT_PROVIDER` | ❌ | `elevenlabs` | `elevenlabs` \| `openai` |
+| `LLM_PROVIDER` | ❌ | `ollama` | `ollama` \| `anthropic` \| `openai` \| `google` |
+| `OLLAMA_BASE_URL` | ❌ | `http://localhost:11434` | Ollama server URL |
+| `MAX_TURNS` | ❌ | `8` | Interview length in turns |
 
 ### Frontend (`frontend/.env.local`)
 
@@ -393,20 +430,21 @@ Set `AUTH_ENABLED = false` in `frontend/lib/auth-config.ts` to skip Supabase Aut
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Same Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon key |
-| `NEXT_PUBLIC_API_URL` | ✅ | Backend URL (`http://localhost:8000` or your Cloud Run URL) |
 | `NEXT_PUBLIC_SITE_URL` | ❌ | Canonical URL for SEO metadata |
+
+> **Note:** The frontend no longer needs `NEXT_PUBLIC_API_URL`. All API calls are proxied through the Next.js catch-all route at `/api/[...path]`, which forwards to the FastAPI backend running on port 8000.
 
 ---
 
 ## API Reference
 
-All endpoints accept an optional `X-User-Id` header (sent automatically by the frontend to scope sessions to a user).
+All endpoints accept an `X-User-Id` header (sent automatically by the frontend to scope sessions to a user).
 
 ### Sessions
 
 ```
 POST  /sessions                  Create a session (multipart/form-data)
-POST  /sessions/{id}/start       Get the first question
+POST  /sessions/{id}/start       Get the first question (called before navigating to interview)
 POST  /sessions/{id}/turn        Submit an answer → full agent pipeline
 GET   /sessions/{id}/report      Post-session report (scores, notes, transcript)
 GET   /sessions/{id}/history     Raw message history
@@ -458,7 +496,7 @@ GET   /sessions/{id}/history     Raw message history
 ```
 POST  /tts                   Synthesize text → base64 MP3
 POST  /tts/interrupt         Cancel active TTS playback for a session
-POST  /tts/transcribe        Transcribe audio file → transcript string (Whisper)
+POST  /tts/transcribe        Transcribe audio file → transcript string
 ```
 
 **`POST /tts/transcribe`** — multipart form:
@@ -505,8 +543,10 @@ gcloud run deploy friday-backend \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars "ANTHROPIC_API_KEY=...,OPENAI_API_KEY=...,SUPABASE_URL=..."
+  --set-env-vars "ELEVENLABS_API_KEY=...,OPENAI_API_KEY=...,SUPABASE_URL=...,LLM_PROVIDER=anthropic,ANTHROPIC_API_KEY=..."
 ```
+
+> When deploying to Cloud Run, set `LLM_PROVIDER=anthropic` (or `openai`/`google`) since Ollama is a local-only server.
 
 ### Frontend → Vercel (manual)
 
@@ -514,7 +554,7 @@ gcloud run deploy friday-backend \
 cd frontend && vercel --prod
 ```
 
-Set `NEXT_PUBLIC_API_URL` to your Cloud Run service URL in the Vercel project settings.
+Set your Supabase environment variables in the Vercel project settings. No backend URL env var is needed — the catch-all proxy route always targets port 8000 in development and your Cloud Run URL in production (configure this in `app/api/[...path]/route.ts`).
 
 ---
 
@@ -526,6 +566,6 @@ MIT — see [LICENSE](LICENSE) for details.
 
 <div align="center">
 
-Built by [Variant Labs](https://www.vriantlabs.com) · [hello@vriantlabs.com](mailto:hello@vriantlabs.com)
+Developed by [Mostofa Shakib](https://www.mostofashakib.com)
 
 </div>
